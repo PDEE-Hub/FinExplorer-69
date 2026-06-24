@@ -19,6 +19,10 @@
   --green:#10b981; --green2:#34d399;
   --purple:#8b5cf6; --purple2:#a78bfa;
   --coral:#e85c4a;
+  /* muted earthy palette for รายได้/ค่าใช้จ่าย/กำไร (Pinterest-style, desaturated) */
+  --gold:#b8853a; --gold2:#e0b563;
+  --rust:#7a2418; --rust2:#c4543d;
+  --forest:#2f6b43; --forest2:#5fae78;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
@@ -51,6 +55,9 @@ body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-h
 .sc.teal::after{background:linear-gradient(90deg,var(--teal),var(--teal2));}
 .sc.blue::after{background:linear-gradient(90deg,var(--blue),var(--blue2));}
 .sc.amber::after{background:linear-gradient(90deg,var(--amber),var(--amber2));}
+.sc.gold::after{background:linear-gradient(90deg,var(--gold),var(--gold2));}
+.sc.rust::after{background:linear-gradient(90deg,var(--rust),var(--rust2));}
+.sc.forest::after{background:linear-gradient(90deg,var(--forest),var(--forest2));}
 .sc.green::after{background:linear-gradient(90deg,var(--green),var(--green2));}
 .sc-label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#7a9ab8;margin-bottom:4px;}
 .sc-val{font-size:22px;font-weight:700;font-family:'Kanit',monospace;letter-spacing:-.03em;line-height:1;}
@@ -376,24 +383,24 @@ function renderOverview() {
   } : { rev: '', exp: '', net: '' };
 
   document.getElementById('ov-kpis').innerHTML = `
-    <div class="sc teal">
+    <div class="sc gold">
       <div class="sc-label">รายได้รวม · ${FY_LABEL_TH[ovFy]}</div>
-      <div class="sc-val" style="color:var(--teal2);">${fmt(rev / 1e6)}</div>
+      <div class="sc-val" style="color:var(--gold2);">${fmt(rev / 1e6)}</div>
       <div class="sc-sub"><span style="color:var(--text3);">ล้านบาท</span>${ch.rev}</div>
     </div>
-    <div class="sc blue">
+    <div class="sc rust">
       <div class="sc-label">ค่าใช้จ่ายรวม · ${FY_LABEL_TH[ovFy]}</div>
-      <div class="sc-val" style="color:var(--blue2);">${fmt(exp / 1e6)}</div>
+      <div class="sc-val" style="color:var(--rust2);">${fmt(exp / 1e6)}</div>
       <div class="sc-sub"><span style="color:var(--text3);">ล้านบาท</span>${ch.exp}</div>
     </div>
-    <div class="sc amber">
+    <div class="sc forest">
       <div class="sc-label">กำไรสุทธิ · ${FY_LABEL_TH[ovFy]}</div>
-      <div class="sc-val" style="color:var(--amber2);">${fmt(net / 1e6)}</div>
+      <div class="sc-val" style="color:var(--forest2);">${fmt(net / 1e6)}</div>
       <div class="sc-sub"><span style="color:var(--text3);">ล้านบาท</span>${ch.net}</div>
     </div>
-    <div class="sc green">
+    <div class="sc forest">
       <div class="sc-label">Net Margin</div>
-      <div class="sc-val" style="color:var(--green2);">${fmt(margin)}%</div>
+      <div class="sc-val" style="color:var(--forest2);">${fmt(margin)}%</div>
       <div class="sc-sub"><span style="color:var(--text3);">กำไร / รายได้</span></div>
     </div>
   `;
@@ -437,8 +444,20 @@ function renderTreemap(months) {
     if (!agg[key]) agg[key] = { value: 0, cat1: r.cat1, cat2: r.cat2, cat3: r.cat3 };
     agg[key].value += val;
   });
-  const tree = Object.keys(agg).map(k => ({ label: k, value: agg[k].value, cat1: agg[k].cat1, cat2: agg[k].cat2, cat3: agg[k].cat3 }))
+  let tree = Object.keys(agg).map(k => ({ label: k, value: agg[k].value, cat1: agg[k].cat1, cat2: agg[k].cat2, cat3: agg[k].cat3 }))
     .filter(d => d.value > 0);
+
+  // shade each tile by its proportion within its own cat1 (รายได้/ค่าใช้จ่าย) family —
+  // largest activity = most saturated/dark, smallest = lightest. Normalized per-family
+  // (not globally) so both hues use their full light→dark range regardless of relative scale.
+  const maxByCat1 = {};
+  tree.forEach(d => { maxByCat1[d.cat1] = Math.max(maxByCat1[d.cat1] || 0, d.value); });
+  tree = tree.map(d => ({ ...d, ratio: maxByCat1[d.cat1] ? d.value / maxByCat1[d.cat1] : 0 }));
+
+  function shadeFor(cat1, ratio) {
+    const lightness = 78 - ratio * 46; // 78% (lightest) -> 32% (darkest), muted/desaturated
+    return cat1 === 'รายได้' ? `hsl(40, 48%, ${lightness}%)` : `hsl(9, 46%, ${lightness}%)`;
+  }
 
   renderBreadcrumb();
 
@@ -457,12 +476,15 @@ function renderTreemap(months) {
         borderColor: 'rgba(6,15,30,.6)',
         backgroundColor(ctx) {
           if (!ctx.raw || !ctx.raw._data) return 'rgba(59,130,246,.3)';
-          const cat1 = depth === 0 ? ctx.raw._data.label.split(' › ')[0] : ctx.raw._data.children[0].cat1;
-          return cat1 === 'รายได้' ? 'rgba(20,184,166,.55)' : 'rgba(59,130,246,.55)';
+          const d = ctx.raw._data.children[0];
+          return shadeFor(d.cat1, d.ratio);
         },
         labels: {
           display: true,
-          color: '#edf2fc',
+          color(ctx) {
+            if (!ctx.raw || !ctx.raw._data) return '#edf2fc';
+            return ctx.raw._data.children[0].ratio > 0.46 ? '#fff8ec' : '#2a1d10';
+          },
           font: { family: 'Kanit', size: 11 },
           formatter(ctx) {
             if (!ctx.raw) return '';
@@ -541,9 +563,9 @@ function renderCompare() {
     </div>`;
   }
   document.getElementById('cmp-kpis').innerHTML =
-    kpiCard('รายได้รวม 8 เดือน', rev68, rev69, 'teal', 'var(--teal2)') +
-    kpiCard('ค่าใช้จ่ายรวม 8 เดือน', exp68, exp69, 'blue', 'var(--blue2)') +
-    kpiCard('กำไรสุทธิ 8 เดือน', net68, net69, 'amber', 'var(--amber2)');
+    kpiCard('รายได้รวม 8 เดือน', rev68, rev69, 'gold', 'var(--gold2)') +
+    kpiCard('ค่าใช้จ่ายรวม 8 เดือน', exp68, exp69, 'rust', 'var(--rust2)') +
+    kpiCard('กำไรสุทธิ 8 เดือน', net68, net69, 'forest', 'var(--forest2)');
 
   // group by cat1>cat2
   const rows = leafRows('กทท.');
@@ -646,7 +668,7 @@ function renderTable() {
     return;
   }
   tbody.innerHTML = rows.slice(0, 500).map(r => {
-    const barColor = r.cat1 === 'รายได้' ? 'rgba(20,184,166,1)' : 'rgba(59,130,246,1)';
+    const barColor = r.cat1 === 'รายได้' ? 'rgba(224,181,99,1)' : 'rgba(196,84,61,1)';
     const barW = Math.abs(r.amount) / maxAbs * 100;
     return `<tr>
       <td>${r.entity}</td>

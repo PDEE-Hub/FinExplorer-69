@@ -85,18 +85,11 @@ body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-h
 .xp-treemap-wrap{position:relative;height:420px;}
 .xp-sankey-wrap{position:relative;height:460px;}
 
-/* ranked horizontal bar list (port comparison / pareto-style) */
-.pareto-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;border-radius:4px;padding:4px;}
-.pr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.pr-name{font-size:12.5px;color:var(--text2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pr-bar-wrap{width:140px;height:7px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;flex-shrink:0;}
-.pr-bar{height:100%;border-radius:3px;}
-.pr-val{font-size:12.5px;font-family:'Kanit',monospace;width:78px;text-align:right;flex-shrink:0;}
-
 /* revenue-share vs expense-share per port */
 .portshare-row{padding:10px 4px;border-bottom:1px solid var(--border);}
 .portshare-row:last-child{border-bottom:none;}
-.portshare-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;}
+.portshare-head{display:flex;align-items:baseline;gap:8px;margin-bottom:6px;}
+.portshare-head .portshare-name{margin-right:auto;}
 .portshare-name{font-size:13px;font-weight:600;color:var(--text);}
 .portshare-gap{font-size:11px;font-family:'Kanit',monospace;padding:1px 7px;border-radius:3px;}
 .ps-line{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
@@ -232,7 +225,7 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
   <div class="view-page active" id="view-overview">
     <div class="score-strip-simple" id="ov-kpis"></div>
     <div class="xp-pageheader">
-      <div class="xp-pagetitle">ภาพรวมงบการเงิน กทท. (ทั้งองค์กร)</div>
+      <div class="xp-pagetitle">ภาพรวมงบการเงิน — <span id="ov-pagetitle-entity">กทท. (ทั้งองค์กร)</span></div>
       <div class="year-tabs" id="ov-year-tabs">
         <div class="ytab active" data-fy="fy2569">FY2569 (8 เดือน)</div>
         <div class="ytab" data-fy="fy2568">FY2568 (เต็มปี)</div>
@@ -252,14 +245,9 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
         <div class="xp-sankey-wrap"><canvas id="ov-sankey"></canvas></div>
       </div>
       <div class="xp-panel">
-        <div class="xp-panel-title">สัดส่วนรายได้ vs ค่าใช้จ่าย ต่อท่าเรือ</div>
-        <div class="xp-panel-sub">% ของรายได้รวม และ % ของค่าใช้จ่ายรวม ของ 4 ท่าเรือ (ทกท./ทลฉ./ทรน./ทชส.) — ถ้าแถบค่าใช้จ่าย (แดง) ยาวกว่าแถบรายได้ (เหลือง) มาก แปลว่าท่าเรือนั้นแบกสัดส่วนต้นทุนมากกว่าสัดส่วนรายได้ที่ทำได้</div>
+        <div class="xp-panel-title">เปรียบเทียบ 4 ท่าเรือ — สัดส่วนรายได้/ค่าใช้จ่าย และกำไรสุทธิ</div>
+        <div class="xp-panel-sub">ทกท. / ทลฉ. / ทรน. / ทชส. — มุมมองแยกต่างหาก ไม่ได้รวมอยู่ใน กทท. ข้างบน · % เทียบกับยอดรวม 4 ท่าเรือ ถ้าแถบค่าใช้จ่าย (แดง) ยาวกว่าแถบรายได้ (เหลือง) มาก แปลว่าท่าเรือนั้นแบกสัดส่วนต้นทุนมากกว่าสัดส่วนรายได้ที่ทำได้</div>
         <div id="ov-portshare"></div>
-      </div>
-      <div class="xp-panel">
-        <div class="xp-panel-title">เปรียบเทียบรายท่าเรือ — กำไรสุทธิ</div>
-        <div class="xp-panel-sub">ทกท. / ทลฉ. / ทรน. / ทชส. — มุมมองแยกต่างหาก ไม่ได้รวมอยู่ใน กทท. ข้างบน</div>
-        <div id="ov-ports"></div>
       </div>
     </div>
   </div>
@@ -423,6 +411,11 @@ document.querySelectorAll('.nav-item').forEach(el => {
     document.querySelectorAll('.view-page').forEach(v => v.classList.remove('active'));
     el.classList.add('active');
     document.getElementById('view-' + el.dataset.view).classList.add('active');
+    // re-render the destination tab so it reflects the shared entity/year state
+    // (e.g. switching ports on Overview, then jumping to Compare, shows that same port)
+    if (el.dataset.view === 'overview') renderOverview();
+    else if (el.dataset.view === 'compare') renderCompare();
+    else if (el.dataset.view === 'table') renderTable();
   });
 });
 
@@ -444,30 +437,18 @@ function renderTreemapEntityTabs() {
     el.addEventListener('click', () => {
       treemapEntity = el.dataset.entity;
       treemapPath = [];
-      renderTreemap(FY_MONTHS[ovFy]);
-      renderSankey(FY_MONTHS[ovFy]);
+      renderOverview();
     });
   });
 }
 
 function renderOverview() {
   const months = FY_MONTHS[ovFy];
-  const rev = entityTotals('กทท.', ovFy, months, 'รายได้');
-  const exp = entityTotals('กทท.', ovFy, months, 'ค่าใช้จ่าย');
+  document.getElementById('ov-pagetitle-entity').textContent = TREEMAP_ENTITY_LABEL[treemapEntity];
+  const rev = entityTotals(treemapEntity, ovFy, months, 'รายได้');
+  const exp = entityTotals(treemapEntity, ovFy, months, 'ค่าใช้จ่าย');
   const net = rev - exp;
   const margin = rev ? (net / rev * 100) : 0;
-
-  let deltaHtml = '';
-  if (ovFy === 'fy2569') {
-    const prevRev = entityTotals('กทท.', 'fy2568', months, 'รายได้');
-    const prevExp = entityTotals('กทท.', 'fy2568', months, 'ค่าใช้จ่าย');
-    const prevNet = prevRev - prevExp;
-    deltaHtml = {
-      rev: pctChip(rev, prevRev),
-      exp: pctChip(exp, prevExp),
-      net: pctChip(net, prevNet),
-    };
-  }
 
   function pctChip(cur, prev) {
     if (!prev) return '';
@@ -478,9 +459,9 @@ function renderOverview() {
   }
 
   const ch = ovFy === 'fy2569' ? {
-    rev: pctChip(rev, entityTotals('กทท.', 'fy2568', months, 'รายได้')),
-    exp: pctChip(exp, entityTotals('กทท.', 'fy2568', months, 'ค่าใช้จ่าย')),
-    net: pctChip(net, entityNet('กทท.', 'fy2568', months)),
+    rev: pctChip(rev, entityTotals(treemapEntity, 'fy2568', months, 'รายได้')),
+    exp: pctChip(exp, entityTotals(treemapEntity, 'fy2568', months, 'ค่าใช้จ่าย')),
+    net: pctChip(net, entityNet(treemapEntity, 'fy2568', months)),
   } : { rev: '', exp: '', net: '' };
 
   document.getElementById('ov-kpis').innerHTML = `
@@ -509,7 +490,6 @@ function renderOverview() {
   renderTreemap(months);
   renderSankey(months);
   renderPortShare(months);
-  renderPortCompare(months);
 }
 
 function renderBreadcrumb() {
@@ -714,15 +694,18 @@ function renderPortShare(months) {
     d.revPct = totalRev ? d.rev / totalRev * 100 : 0;
     d.expPct = totalExp ? d.exp / totalExp * 100 : 0;
     d.gap = d.revPct - d.expPct;
+    d.net = d.rev - d.exp;
   });
   data.sort((a, b) => b.revPct - a.revPct);
 
   document.getElementById('ov-portshare').innerHTML = data.map(d => {
     const gapCls = d.gap >= 0 ? 'up' : 'dn';
     const gapTxt = (d.gap >= 0 ? '+' : '') + fmt(d.gap) + 'pp ' + (d.gap >= 0 ? 'รายได้นำ' : 'ค่าใช้จ่ายนำ');
+    const netCls = d.net >= 0 ? 'up' : 'dn';
     return `<div class="portshare-row">
       <div class="portshare-head">
         <div class="portshare-name">${d.name}</div>
+        <div class="portshare-gap ${netCls}">กำไรสุทธิ ${fmtSigned(d.net / 1e6)} ลบ.</div>
         <div class="portshare-gap ${gapCls}">${gapTxt}</div>
       </div>
       <div class="ps-line">
@@ -739,22 +722,6 @@ function renderPortShare(months) {
   }).join('');
 }
 
-function renderPortCompare(months) {
-  const data = PORTS.map(p => ({ name: p, net: entityNet(p, ovFy, months) }));
-  const maxAbs = Math.max(...data.map(d => Math.abs(d.net)), 1);
-  const html = data.sort((a, b) => b.net - a.net).map(d => {
-    const pct = Math.abs(d.net) / maxAbs * 100;
-    const color = d.net >= 0 ? 'var(--green2)' : 'var(--red2)';
-    return `<div class="pareto-row">
-      <div class="pr-dot" style="background:${color};"></div>
-      <div class="pr-name">${d.name}</div>
-      <div class="pr-bar-wrap"><div class="pr-bar" style="width:${pct}%;background:${color};"></div></div>
-      <div class="pr-val" style="color:${color};">${fmt(d.net / 1e6)} ลบ.</div>
-    </div>`;
-  }).join('');
-  document.getElementById('ov-ports').innerHTML = html;
-}
-
 document.querySelectorAll('#ov-year-tabs .ytab').forEach(el => {
   el.addEventListener('click', () => {
     document.querySelectorAll('#ov-year-tabs .ytab').forEach(n => n.classList.remove('active'));
@@ -769,30 +736,29 @@ document.querySelectorAll('#ov-year-tabs .ytab').forEach(el => {
 // ════════════════════════════════════════════════════════════
 let cmpDivChart = null;
 
-let cmpEntity = 'กทท.';
-
 function renderCompareEntityTabs() {
   const wrap = document.getElementById('cmp-entity-tabs');
   wrap.innerHTML = ['กทท.', ...PORTS].map(e =>
-    `<div class="ytab${e === cmpEntity ? ' active' : ''}" data-entity="${e}">${TREEMAP_ENTITY_LABEL[e]}</div>`
+    `<div class="ytab${e === treemapEntity ? ' active' : ''}" data-entity="${e}">${TREEMAP_ENTITY_LABEL[e]}</div>`
   ).join('');
   wrap.querySelectorAll('.ytab').forEach(el => {
     el.addEventListener('click', () => {
-      cmpEntity = el.dataset.entity;
+      treemapEntity = el.dataset.entity;
+      treemapPath = [];
       renderCompare();
     });
   });
-  document.getElementById('cmp-entity-label').textContent = TREEMAP_ENTITY_LABEL[cmpEntity];
-  document.getElementById('cmp-item-entity-label').textContent = TREEMAP_ENTITY_LABEL[cmpEntity];
+  document.getElementById('cmp-entity-label').textContent = TREEMAP_ENTITY_LABEL[treemapEntity];
+  document.getElementById('cmp-item-entity-label').textContent = TREEMAP_ENTITY_LABEL[treemapEntity];
 }
 
 function renderCompare() {
   renderCompareEntityTabs();
   const months = 8;
-  const rev69 = entityTotals(cmpEntity, 'fy2569', months, 'รายได้');
-  const rev68 = entityTotals(cmpEntity, 'fy2568', months, 'รายได้');
-  const exp69 = entityTotals(cmpEntity, 'fy2569', months, 'ค่าใช้จ่าย');
-  const exp68 = entityTotals(cmpEntity, 'fy2568', months, 'ค่าใช้จ่าย');
+  const rev69 = entityTotals(treemapEntity, 'fy2569', months, 'รายได้');
+  const rev68 = entityTotals(treemapEntity, 'fy2568', months, 'รายได้');
+  const exp69 = entityTotals(treemapEntity, 'fy2569', months, 'ค่าใช้จ่าย');
+  const exp68 = entityTotals(treemapEntity, 'fy2568', months, 'ค่าใช้จ่าย');
   const net69 = rev69 - exp69, net68 = rev68 - exp68;
 
   function kpiCard(label, v68, v69, colorClass, colorVar) {
@@ -811,7 +777,7 @@ function renderCompare() {
     kpiCard('กำไรสุทธิ 8 เดือน', net68, net69, 'forest', 'var(--forest2)');
 
   // group by cat1>cat2
-  const rows = leafRows(cmpEntity);
+  const rows = leafRows(treemapEntity);
   const byCat = {};
   rows.forEach(r => {
     const key = r.cat1 + ' › ' + r.cat2;
@@ -872,7 +838,7 @@ let cmpItemTab = 'up';
 function buildItemChanges() {
   const months = 8;
   const out = [];
-  leafRows(cmpEntity).forEach(r => {
+  leafRows(treemapEntity).forEach(r => {
     const fy2568 = sumRange(r.fy2568, months);
     const fy2569 = sumRange(r.fy2569, months);
     if (fy2568 === 0 && fy2569 === 0) return;

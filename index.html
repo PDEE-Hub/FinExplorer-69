@@ -131,6 +131,10 @@ body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-h
 .xf-count{margin-left:auto;font-size:11px;color:var(--text3);font-family:'Kanit',monospace;}
 .xf-group-body{margin-top:9px;}
 .xf-group.collapsed .xf-group-body{display:none;}
+.xf-group-actions{display:flex;gap:6px;font-size:10.5px;color:var(--text3);margin-bottom:7px;}
+.xf-group-actions span[data-act]{cursor:pointer;}
+.xf-group-actions span[data-act]:hover{color:var(--blue2);text-decoration:underline;}
+.xf-group-actions .sep{opacity:.4;}
 .xf-search{width:100%;background:var(--card);border:1px solid var(--border2);color:var(--text);font-family:'Kanit',sans-serif;font-size:11.5px;padding:6px 9px;border-radius:5px;margin-bottom:8px;box-sizing:border-box;}
 .xf-checklist{max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
 .xf-check-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);cursor:pointer;}
@@ -326,17 +330,24 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
 
           <div class="xf-group" data-group="entity">
             <div class="xf-group-head"><span class="xf-chevron">▾</span><span>หน่วยงาน</span><span class="xf-count" id="xf-count-entity"></span></div>
-            <div class="xf-group-body"><div class="xf-checklist" id="xf-body-entity"></div></div>
+            <div class="xf-group-body">
+              <div class="xf-group-actions"><span data-act="all">เลือกทั้งหมด</span><span class="sep">·</span><span data-act="none">ไม่เลือกเลย</span></div>
+              <div class="xf-checklist" id="xf-body-entity"></div>
+            </div>
           </div>
 
           <div class="xf-group" data-group="cat1">
             <div class="xf-group-head"><span class="xf-chevron">▾</span><span>หมวดหมู่หลัก</span><span class="xf-count" id="xf-count-cat1"></span></div>
-            <div class="xf-group-body"><div class="xf-checklist" id="xf-body-cat1"></div></div>
+            <div class="xf-group-body">
+              <div class="xf-group-actions"><span data-act="all">เลือกทั้งหมด</span><span class="sep">·</span><span data-act="none">ไม่เลือกเลย</span></div>
+              <div class="xf-checklist" id="xf-body-cat1"></div>
+            </div>
           </div>
 
           <div class="xf-group" data-group="cat2">
             <div class="xf-group-head"><span class="xf-chevron">▾</span><span>หมวดหมู่รอง</span><span class="xf-count" id="xf-count-cat2"></span></div>
             <div class="xf-group-body">
+              <div class="xf-group-actions"><span data-act="all">เลือกทั้งหมด</span><span class="sep">·</span><span data-act="none">ไม่เลือกเลย</span></div>
               <input class="xf-search" id="xf-search-cat2" type="text" placeholder="ค้นหาหมวดหมู่รอง...">
               <div class="xf-checklist" id="xf-body-cat2"></div>
             </div>
@@ -345,6 +356,7 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
           <div class="xf-group collapsed" data-group="cat3">
             <div class="xf-group-head"><span class="xf-chevron">▸</span><span>หมวดหมู่ย่อย</span><span class="xf-count" id="xf-count-cat3"></span></div>
             <div class="xf-group-body">
+              <div class="xf-group-actions"><span data-act="all">เลือกทั้งหมด</span><span class="sep">·</span><span data-act="none">ไม่เลือกเลย</span></div>
               <input class="xf-search" id="xf-search-cat3" type="text" placeholder="ค้นหาหมวดหมู่ย่อย...">
               <div class="xf-checklist" id="xf-body-cat3"></div>
             </div>
@@ -984,6 +996,18 @@ function initTableFilters() {
 
   document.getElementById('xf-search-cat2').addEventListener('input', e => renderChecklist('cat2', cat2s, cat2Body, e.target.value));
   document.getElementById('xf-search-cat3').addEventListener('input', e => renderChecklist('cat3', cat3s, cat3Body, e.target.value));
+
+  const groupValues = { entity: entities, cat1: cat1s, cat2: cat2s, cat3: cat3s };
+  const groupBody = { entity: document.getElementById('xf-body-entity'), cat1: document.getElementById('xf-body-cat1'), cat2: cat2Body, cat3: cat3Body };
+  document.querySelectorAll('.xf-group-actions span[data-act]').forEach(span => {
+    span.addEventListener('click', () => {
+      const groupKey = span.closest('.xf-group').dataset.group;
+      tblFilters[groupKey] = span.dataset.act === 'all' ? new Set(groupValues[groupKey]) : new Set();
+      const searchInput = document.getElementById('xf-search-' + groupKey);
+      renderChecklist(groupKey, groupValues[groupKey], groupBody[groupKey], searchInput ? searchInput.value : '');
+      renderTable();
+    });
+  });
 
   const chipDefs = [
     { label: 'ทั้งหมด', value: 0 },

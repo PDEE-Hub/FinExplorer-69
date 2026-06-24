@@ -194,8 +194,9 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
     </div>
     <div class="xp-body">
       <div class="xp-panel">
-        <div class="xp-panel-title">แผนผังงบ — รายได้ / ค่าใช้จ่าย → หมวดหมู่รอง → หมวดหมู่ย่อย → รายการ</div>
+        <div class="xp-panel-title">แผนผังงบ — <span id="tm-entity-label">กทท. (ทั้งองค์กร)</span> : รายได้ / ค่าใช้จ่าย → หมวดหมู่รอง → หมวดหมู่ย่อย → รายการ</div>
         <div class="xp-panel-sub">ขนาดพื้นที่ = สัดส่วนจำนวนเงิน · คลิกกล่องเพื่อดูรายละเอียดลึกขึ้น</div>
+        <div class="year-tabs" id="tm-entity-tabs" style="margin:0 0 12px;justify-content:flex-start;"></div>
         <div class="xp-breadcrumb" id="ov-breadcrumb"></div>
         <div class="xp-treemap-wrap"><canvas id="ov-treemap"></canvas></div>
       </div>
@@ -324,6 +325,22 @@ document.querySelectorAll('.nav-item').forEach(el => {
 let ovTreemapChart = null;
 let ovFy = 'fy2569';
 let treemapPath = []; // [] = root (cat1+cat2) · [cat1,cat2] = drilled to cat3 · [cat1,cat2,cat3] = drilled to item (leaf)
+let treemapEntity = 'กทท.';
+const TREEMAP_ENTITY_LABEL = { 'กทท.': 'กทท. (ทั้งองค์กร)', 'ทกท.': 'ทกท.', 'ทลฉ.': 'ทลฉ.', 'ทรน.': 'ทรน.', 'ทชส.': 'ทชส.' };
+
+function renderTreemapEntityTabs() {
+  const wrap = document.getElementById('tm-entity-tabs');
+  wrap.innerHTML = ['กทท.', ...PORTS].map(e =>
+    `<div class="ytab${e === treemapEntity ? ' active' : ''}" data-entity="${e}">${TREEMAP_ENTITY_LABEL[e]}</div>`
+  ).join('');
+  wrap.querySelectorAll('.ytab').forEach(el => {
+    el.addEventListener('click', () => {
+      treemapEntity = el.dataset.entity;
+      treemapPath = [];
+      renderTreemap(FY_MONTHS[ovFy]);
+    });
+  });
+}
 
 function renderOverview() {
   const months = FY_MONTHS[ovFy];
@@ -403,7 +420,9 @@ function renderBreadcrumb() {
 }
 
 function renderTreemap(months) {
-  const rows = leafRows('กทท.').filter(r =>
+  renderTreemapEntityTabs();
+  document.getElementById('tm-entity-label').textContent = TREEMAP_ENTITY_LABEL[treemapEntity];
+  const rows = leafRows(treemapEntity).filter(r =>
     (treemapPath.length < 1 || r.cat1 === treemapPath[0]) &&
     (treemapPath.length < 2 || r.cat2 === treemapPath[1]) &&
     (treemapPath.length < 3 || r.cat3 === treemapPath[2])

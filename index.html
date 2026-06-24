@@ -19,10 +19,10 @@
   --green:#10b981; --green2:#34d399;
   --purple:#8b5cf6; --purple2:#a78bfa;
   --coral:#e85c4a;
-  /* muted earthy palette for รายได้/ค่าใช้จ่าย/กำไร (Pinterest-style, desaturated) */
-  --gold:#b8853a; --gold2:#e0b563;
-  --rust:#7a2418; --rust2:#c4543d;
-  --forest:#2f6b43; --forest2:#5fae78;
+  /* exact palette from reference: รายได้=gold #DFAB50 (h38 s69 l59) · ค่าใช้จ่าย=rust #932717 (h8 s73 l33) · กำไร=forest #367C4B (h138 s39 l35) */
+  --gold:#DFAB50; --gold2:#e9c586;
+  --rust:#932717; --rust2:#dd3b22;
+  --forest:#367C4B; --forest2:#55b472;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html{scroll-behavior:smooth;}
@@ -468,15 +468,31 @@ function renderTreemap(months) {
     .filter(d => d.value > 0);
 
   // shade each tile by its proportion within its own cat1 (รายได้/ค่าใช้จ่าย) family —
-  // largest activity = most saturated/dark, smallest = lightest. Normalized per-family
-  // (not globally) so both hues use their full light→dark range regardless of relative scale.
-  const maxByCat1 = {};
-  tree.forEach(d => { maxByCat1[d.cat1] = Math.max(maxByCat1[d.cat1] || 0, d.value); });
-  tree = tree.map(d => ({ ...d, ratio: maxByCat1[d.cat1] ? d.value / maxByCat1[d.cat1] : 0 }));
+  // largest activity = closest to the exact reference color, smaller ones = lighter tints.
+  // Normalized per-family (not globally) so both hues use their full range regardless of scale.
+  const maxByCat1 = {}, totalByCat1 = {};
+  tree.forEach(d => {
+    maxByCat1[d.cat1] = Math.max(maxByCat1[d.cat1] || 0, d.value);
+    totalByCat1[d.cat1] = (totalByCat1[d.cat1] || 0) + d.value;
+  });
+  tree = tree.map(d => ({
+    ...d,
+    ratio: maxByCat1[d.cat1] ? d.value / maxByCat1[d.cat1] : 0,
+    pctOfCat1: totalByCat1[d.cat1] ? d.value / totalByCat1[d.cat1] * 100 : 0,
+  }));
 
+  // hue/sat fixed exactly to the reference colors (รายได้ #DFAB50, ค่าใช้จ่าย #932717);
+  // only lightness moves with proportion, anchored so the single largest tile in each
+  // family lands almost exactly on the reference color itself.
+  const HUE = { 'รายได้': [38, 69, 59], 'ค่าใช้จ่าย': [8, 73, 33] }; // [hue, sat%, baseLightness% at ratio=1]
+  function lightnessFor(cat1, ratio) {
+    const [, , baseL] = HUE[cat1] || [0, 0, 50];
+    const span = cat1 === 'รายได้' ? 26 : 30;
+    return baseL + (1 - ratio) * span;
+  }
   function shadeFor(cat1, ratio) {
-    const lightness = 78 - ratio * 46; // 78% (lightest) -> 32% (darkest), muted/desaturated
-    return cat1 === 'รายได้' ? `hsl(40, 48%, ${lightness}%)` : `hsl(9, 46%, ${lightness}%)`;
+    const [h, s] = HUE[cat1] || [210, 40, 50];
+    return `hsl(${h}, ${s}%, ${lightnessFor(cat1, ratio)}%)`;
   }
 
   renderBreadcrumb();
@@ -503,14 +519,19 @@ function renderTreemap(months) {
           display: true,
           color(ctx) {
             if (!ctx.raw || !ctx.raw._data) return '#edf2fc';
-            return ctx.raw._data.children[0].ratio > 0.46 ? '#fff8ec' : '#2a1d10';
+            const d = ctx.raw._data.children[0];
+            return lightnessFor(d.cat1, d.ratio) > 56 ? '#2a1d10' : '#fff8ec';
           },
           font: { family: 'Kanit', size: 11 },
           formatter(ctx) {
             if (!ctx.raw) return '';
+            const d = ctx.raw._data.children[0];
             const v = ctx.raw.v;
             const lbl = depth === 0 ? (ctx.raw._data.label.split(' › ')[1] || ctx.raw._data.label) : ctx.raw._data.label;
-            return [lbl, (v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' ลบ.'];
+            const lines = [lbl, (v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' ลบ.'];
+            // only show % for tiles with enough room to read it
+            if ((ctx.raw.w || 0) * (ctx.raw.h || 0) > 3500) lines.push(fmt(d.pctOfCat1) + '% ของ' + d.cat1);
+            return lines;
           },
         },
       }],
@@ -725,7 +746,7 @@ function renderTable() {
     return;
   }
   tbody.innerHTML = rows.slice(0, 500).map(r => {
-    const barColor = r.cat1 === 'รายได้' ? 'rgba(224,181,99,1)' : 'rgba(196,84,61,1)';
+    const barColor = r.cat1 === 'รายได้' ? '#DFAB50' : '#932717';
     const barW = Math.abs(r.amount) / maxAbs * 100;
     return `<tr>
       <td>${r.entity}</td>

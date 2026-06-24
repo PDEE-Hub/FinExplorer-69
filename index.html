@@ -293,11 +293,12 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
       </div>
       <div class="xp-panel">
         <div class="xp-panel-title">รายการที่เปลี่ยนแปลงมากที่สุด — ระดับรายการย่อย</div>
-        <div class="xp-panel-sub">เจาะลึกถึงรายการเดี่ยว (ไม่ใช่หมวดรวม) เทียบ 8 เดือนแรก FY2568 vs FY2569</div>
+        <div class="xp-panel-sub">เจาะลึกถึงรายการเดี่ยวของ ทกท./ทลฉ./ทรน./ทชส. (ไม่รวม กทท. ส่วนกลาง) เทียบ 8 เดือนแรก FY2568 vs FY2569 — แยกตามหน่วยงานเพราะกิจกรรมชื่อเดียวกันอาจเกิดที่หลายท่าเรือ</div>
         <div class="xf-chips" id="cmp-item-tabs" style="margin-bottom:14px;"></div>
         <div class="xp-table-wrap">
           <table class="xp-table" id="cmp-item-table">
             <thead><tr>
+              <th>หน่วยงาน</th>
               <th>รายการ</th>
               <th class="xp-num">FY2568 (8mo)</th>
               <th class="xp-num">FY2569 (8mo)</th>
@@ -852,19 +853,25 @@ let cmpItemTab = 'up';
 
 function buildItemChanges() {
   const months = 8;
-  return leafRows('กทท.').map(r => {
-    const fy2568 = sumRange(r.fy2568, months);
-    const fy2569 = sumRange(r.fy2569, months);
-    return {
-      label: r.item,
-      breadcrumb: r.cat1 + ' › ' + r.cat2 + ' › ' + r.cat3,
-      fy2568, fy2569,
-      delta: fy2569 - fy2568,
-      deltaPct: fy2568 ? (fy2569 - fy2568) / Math.abs(fy2568) * 100 : null,
-      isNew: fy2568 === 0 && fy2569 !== 0,
-      isCut: fy2568 !== 0 && fy2569 === 0,
-    };
+  const out = [];
+  PORTS.forEach(entity => {
+    leafRows(entity).forEach(r => {
+      const fy2568 = sumRange(r.fy2568, months);
+      const fy2569 = sumRange(r.fy2569, months);
+      if (fy2568 === 0 && fy2569 === 0) return;
+      out.push({
+        entity,
+        label: r.item,
+        breadcrumb: r.cat1 + ' › ' + r.cat2 + ' › ' + r.cat3,
+        fy2568, fy2569,
+        delta: fy2569 - fy2568,
+        deltaPct: fy2568 ? (fy2569 - fy2568) / Math.abs(fy2568) * 100 : null,
+        isNew: fy2568 === 0 && fy2569 !== 0,
+        isCut: fy2568 !== 0 && fy2569 === 0,
+      });
+    });
   });
+  return out;
 }
 
 function renderItemChanges() {
@@ -894,13 +901,14 @@ function renderItemChanges() {
 
   const tbody = document.querySelector('#cmp-item-table tbody');
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="xp-empty">ไม่มีรายการในกลุ่มนี้</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="xp-empty">ไม่มีรายการในกลุ่มนี้</div></td></tr>`;
     return;
   }
   tbody.innerHTML = list.map(d => {
     const color = d.isNew ? 'var(--gold2)' : d.isCut ? 'var(--rust2)' : (d.delta >= 0 ? 'var(--green2)' : 'var(--red2)');
     const pctCell = d.isNew ? 'ใหม่' : d.isCut ? 'ตัด' : fmtSigned(d.deltaPct) + '%';
     return `<tr>
+      <td style="white-space:nowrap;font-weight:600;">${d.entity}</td>
       <td>${d.label}<div style="font-size:10.5px;color:var(--text3);margin-top:2px;">${d.breadcrumb}</div></td>
       <td class="xp-num">${d.fy2568 ? fmt(d.fy2568 / 1e6) : '–'}</td>
       <td class="xp-num">${d.fy2569 ? fmt(d.fy2569 / 1e6) : '–'}</td>

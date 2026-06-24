@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2/dist/chartjs-chart-treemap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey@0/dist/chartjs-chart-sankey.min.js"></script>
 <style>
 :root{
   --bg:#060f1e; --bg2:#0a1628; --panel:#0f1f38; --card:#152540;
@@ -82,6 +83,7 @@ body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-h
 .xp-breadcrumb span:hover{color:var(--blue2);}
 .xp-breadcrumb .sep{cursor:default;opacity:.5;}
 .xp-treemap-wrap{position:relative;height:420px;}
+.xp-sankey-wrap{position:relative;height:460px;}
 
 /* ranked horizontal bar list (port comparison / pareto-style) */
 .pareto-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;border-radius:4px;padding:4px;}
@@ -220,6 +222,11 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
         <div class="year-tabs" id="tm-entity-tabs" style="margin:0 0 12px;justify-content:flex-start;"></div>
         <div class="xp-breadcrumb" id="ov-breadcrumb"></div>
         <div class="xp-treemap-wrap"><canvas id="ov-treemap"></canvas></div>
+      </div>
+      <div class="xp-panel">
+        <div class="xp-panel-title">การไหลของงบ — <span id="sk-entity-label">กทท. (ทั้งองค์กร)</span></div>
+        <div class="xp-panel-sub">รายได้แต่ละหมวด (ซ้าย) ไหลเข้า → หน่วยงาน (กลาง) → ไหลออกเป็นค่าใช้จ่ายแต่ละหมวด (ขวา) ส่วนที่เหลือคือกำไร/ขาดทุนสุทธิ</div>
+        <div class="xp-sankey-wrap"><canvas id="ov-sankey"></canvas></div>
       </div>
       <div class="xp-panel">
         <div class="xp-panel-title">สัดส่วนรายได้ vs ค่าใช้จ่าย ต่อท่าเรือ</div>
@@ -364,6 +371,7 @@ function renderTreemapEntityTabs() {
       treemapEntity = el.dataset.entity;
       treemapPath = [];
       renderTreemap(FY_MONTHS[ovFy]);
+      renderSankey(FY_MONTHS[ovFy]);
     });
   });
 }
@@ -425,6 +433,7 @@ function renderOverview() {
   `;
 
   renderTreemap(months);
+  renderSankey(months);
   renderPortShare(months);
   renderPortCompare(months);
 }
@@ -551,6 +560,70 @@ function renderTreemap(months) {
         }
         setTimeout(() => renderTreemap(months), 0);
       },
+    },
+  });
+}
+
+let ovSankeyChart = null;
+
+function renderSankey(months) {
+  document.getElementById('sk-entity-label').textContent = TREEMAP_ENTITY_LABEL[treemapEntity];
+  const rows = leafRows(treemapEntity);
+  const port = treemapEntity;
+
+  function topByCat2(cat1, topN) {
+    const agg = {};
+    rows.filter(r => r.cat1 === cat1).forEach(r => {
+      agg[r.cat2] = (agg[r.cat2] || 0) + sumRange(r[ovFy], months);
+    });
+    const entries = Object.entries(agg).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+    const top = entries.slice(0, topN);
+    const restSum = entries.slice(topN).reduce((s, [, v]) => s + v, 0);
+    if (restSum > 0) top.push(['อื่นๆ (' + cat1 + ')', restSum]);
+    return top;
+  }
+
+  const revCats = topByCat2('รายได้', 6);
+  const expCats = topByCat2('ค่าใช้จ่าย', 6);
+  const totalRev = revCats.reduce((s, [, v]) => s + v, 0);
+  const totalExp = expCats.reduce((s, [, v]) => s + v, 0);
+  const net = totalRev - totalExp;
+  const revLabels = new Set(revCats.map(([l]) => l));
+  const expLabels = new Set(expCats.map(([l]) => l));
+
+  const data = [];
+  revCats.forEach(([label, value]) => data.push({ from: label, to: port, flow: value / 1e6 }));
+  if (net < 0) data.push({ from: 'ส่วนที่ขาด (ขาดทุน)', to: port, flow: Math.abs(net) / 1e6 });
+  expCats.forEach(([label, value]) => data.push({ from: port, to: label, flow: value / 1e6 }));
+  if (net > 0) data.push({ from: port, to: 'กำไรสุทธิ', flow: net / 1e6 });
+
+  function colorFor(label) {
+    if (label === port) return 'rgba(180,204,232,.45)';
+    if (label === 'กำไรสุทธิ') return '#367C4B';
+    if (label === 'ส่วนที่ขาด (ขาดทุน)') return '#932717';
+    if (revLabels.has(label)) return '#DFAB50';
+    if (expLabels.has(label)) return '#932717';
+    return '#5a7a9a';
+  }
+
+  if (ovSankeyChart) ovSankeyChart.destroy();
+  const ctx = document.getElementById('ov-sankey').getContext('2d');
+  ovSankeyChart = new Chart(ctx, {
+    type: 'sankey',
+    data: {
+      datasets: [{
+        data,
+        colorFrom: (c) => colorFor(c.dataset.data[c.dataIndex].from),
+        colorTo: (c) => colorFor(c.dataset.data[c.dataIndex].to),
+        colorMode: 'gradient',
+        color: '#edf2fc',
+        font: { family: 'Kanit', size: 11 },
+        borderWidth: 0,
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
     },
   });
 }

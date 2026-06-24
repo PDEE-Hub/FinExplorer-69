@@ -35,6 +35,14 @@ body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-h
 .sidebar-logo{padding:16px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
 .sl-title{font-size:15px;font-weight:700;letter-spacing:.04em;color:var(--teal2);line-height:1.2;}
 .sl-sub{font-size:9px;color:#5a7a9a;margin-top:2px;letter-spacing:.04em;}
+.sidebar-focus{padding:11px 16px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(59,130,246,.05);}
+.sidebar-focus.is-port{background:rgba(223,171,80,.08);}
+.sf-label{font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);}
+.sf-entity{font-size:12.5px;font-weight:600;color:var(--text);margin-top:2px;}
+.sidebar-focus.is-port .sf-entity{color:var(--gold2);}
+.sf-reset{font-size:9.5px;color:var(--blue2);cursor:pointer;margin-top:5px;display:none;}
+.sf-reset:hover{text-decoration:underline;}
+.sidebar-focus.is-port .sf-reset{display:block;}
 .sidebar-nav{flex:1;overflow-y:auto;padding:8px 0;}
 .nav-section{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#3d5570;padding:10px 16px 4px;font-weight:600;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:all .15s;border-left:3px solid transparent;position:relative;}
@@ -196,6 +204,11 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
   <div class="sidebar-logo">
     <div class="sl-title">PAT Financial Explorer</div>
     <div class="sl-sub" style="font-weight:700;color:#fff;font-size:10.5px;margin-top:3px;">FY2569 · 8 เดือน</div>
+  </div>
+  <div class="sidebar-focus" id="sidebar-focus">
+    <div class="sf-label">กำลังดู (ภาพรวม + เทียบรายปี)</div>
+    <div class="sf-entity" id="sf-entity-name">กทท. (ทั้งองค์กร)</div>
+    <div class="sf-reset" id="sf-reset">↺ กลับไป กทท. (ทั้งองค์กร)</div>
   </div>
   <div class="sidebar-nav">
     <div class="nav-section">สำรวจงบ กทท.</div>
@@ -428,6 +441,18 @@ let treemapPath = []; // [] = root (cat1+cat2) · [cat1,cat2] = drilled to cat3 
 let treemapEntity = 'กทท.';
 const TREEMAP_ENTITY_LABEL = { 'กทท.': 'กทท. (ทั้งองค์กร)', 'ทกท.': 'ทกท.', 'ทลฉ.': 'ทลฉ.', 'ทรน.': 'ทรน.', 'ทชส.': 'ทชส.' };
 
+function renderSidebarFocus() {
+  const box = document.getElementById('sidebar-focus');
+  document.getElementById('sf-entity-name').textContent = TREEMAP_ENTITY_LABEL[treemapEntity];
+  box.classList.toggle('is-port', treemapEntity !== 'กทท.');
+}
+document.getElementById('sf-reset').addEventListener('click', () => {
+  treemapEntity = 'กทท.';
+  treemapPath = [];
+  renderOverview();
+  renderCompare();
+});
+
 function renderTreemapEntityTabs() {
   const wrap = document.getElementById('tm-entity-tabs');
   wrap.innerHTML = ['กทท.', ...PORTS].map(e =>
@@ -443,6 +468,7 @@ function renderTreemapEntityTabs() {
 }
 
 function renderOverview() {
+  renderSidebarFocus();
   const months = FY_MONTHS[ovFy];
   document.getElementById('ov-pagetitle-entity').textContent = TREEMAP_ENTITY_LABEL[treemapEntity];
   const rev = entityTotals(treemapEntity, ovFy, months, 'รายได้');
@@ -753,6 +779,7 @@ function renderCompareEntityTabs() {
 }
 
 function renderCompare() {
+  renderSidebarFocus();
   renderCompareEntityTabs();
   const months = 8;
   const rev69 = entityTotals(treemapEntity, 'fy2569', months, 'รายได้');

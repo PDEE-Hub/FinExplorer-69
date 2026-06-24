@@ -291,6 +291,23 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
           </table>
         </div>
       </div>
+      <div class="xp-panel">
+        <div class="xp-panel-title">รายการที่เปลี่ยนแปลงมากที่สุด — ระดับรายการย่อย</div>
+        <div class="xp-panel-sub">เจาะลึกถึงรายการเดี่ยว (ไม่ใช่หมวดรวม) เทียบ 8 เดือนแรก FY2568 vs FY2569</div>
+        <div class="xf-chips" id="cmp-item-tabs" style="margin-bottom:14px;"></div>
+        <div class="xp-table-wrap">
+          <table class="xp-table" id="cmp-item-table">
+            <thead><tr>
+              <th>รายการ</th>
+              <th class="xp-num">FY2568 (8mo)</th>
+              <th class="xp-num">FY2569 (8mo)</th>
+              <th class="xp-num">Δ บาท</th>
+              <th class="xp-num">Δ %</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -824,6 +841,73 @@ function renderCompare() {
       <td class="xp-num" style="color:${d.delta >= 0 ? 'var(--green2)' : 'var(--red2)'};">${fmtSigned(d.delta / 1e6)}</td>
       <td class="xp-num" style="color:${d.delta >= 0 ? 'var(--green2)' : 'var(--red2)'};">${fmtSigned(d.deltaPct)}%</td>
     </tr>`).join('');
+
+  renderItemChanges();
+}
+
+// ════════════════════════════════════════════════════════════
+// COMPARE YoY — most-changed individual line items
+// ════════════════════════════════════════════════════════════
+let cmpItemTab = 'up';
+
+function buildItemChanges() {
+  const months = 8;
+  return leafRows('กทท.').map(r => {
+    const fy2568 = sumRange(r.fy2568, months);
+    const fy2569 = sumRange(r.fy2569, months);
+    return {
+      label: r.item,
+      breadcrumb: r.cat1 + ' › ' + r.cat2 + ' › ' + r.cat3,
+      fy2568, fy2569,
+      delta: fy2569 - fy2568,
+      deltaPct: fy2568 ? (fy2569 - fy2568) / Math.abs(fy2568) * 100 : null,
+      isNew: fy2568 === 0 && fy2569 !== 0,
+      isCut: fy2568 !== 0 && fy2569 === 0,
+    };
+  });
+}
+
+function renderItemChanges() {
+  const all = buildItemChanges();
+  const newItems = all.filter(d => d.isNew);
+  const cutItems = all.filter(d => d.isCut);
+  const changed = all.filter(d => !d.isNew && !d.isCut && d.delta !== 0);
+
+  const tabDefs = [
+    { key: 'up', label: 'เพิ่มขึ้นมากสุด' },
+    { key: 'down', label: 'ลดลงมากสุด' },
+    { key: 'new', label: `รายการใหม่ (${newItems.length})` },
+    { key: 'cut', label: `รายการที่ถูกตัด (${cutItems.length})` },
+  ];
+  document.getElementById('cmp-item-tabs').innerHTML = tabDefs.map(t =>
+    `<div class="xf-chip${t.key === cmpItemTab ? ' active' : ''}" data-tab="${t.key}">${t.label}</div>`).join('');
+  document.querySelectorAll('#cmp-item-tabs .xf-chip').forEach(chip => {
+    chip.addEventListener('click', () => { cmpItemTab = chip.dataset.tab; renderItemChanges(); });
+  });
+
+  let list;
+  if (cmpItemTab === 'up') list = all.filter(d => d.delta > 0).sort((a, b) => b.delta - a.delta);
+  else if (cmpItemTab === 'down') list = all.filter(d => d.delta < 0).sort((a, b) => a.delta - b.delta);
+  else if (cmpItemTab === 'new') list = newItems.sort((a, b) => b.fy2569 - a.fy2569);
+  else list = cutItems.sort((a, b) => b.fy2568 - a.fy2568);
+  list = list.slice(0, 30);
+
+  const tbody = document.querySelector('#cmp-item-table tbody');
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="xp-empty">ไม่มีรายการในกลุ่มนี้</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(d => {
+    const color = d.isNew ? 'var(--gold2)' : d.isCut ? 'var(--rust2)' : (d.delta >= 0 ? 'var(--green2)' : 'var(--red2)');
+    const pctCell = d.isNew ? 'ใหม่' : d.isCut ? 'ตัด' : fmtSigned(d.deltaPct) + '%';
+    return `<tr>
+      <td>${d.label}<div style="font-size:10.5px;color:var(--text3);margin-top:2px;">${d.breadcrumb}</div></td>
+      <td class="xp-num">${d.fy2568 ? fmt(d.fy2568 / 1e6) : '–'}</td>
+      <td class="xp-num">${d.fy2569 ? fmt(d.fy2569 / 1e6) : '–'}</td>
+      <td class="xp-num" style="color:${color};">${fmtSigned(d.delta / 1e6)}</td>
+      <td class="xp-num" style="color:${color};">${pctCell}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ════════════════════════════════════════════════════════════

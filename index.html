@@ -194,8 +194,9 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
     </div>
     <div class="xp-body">
       <div class="xp-panel">
-        <div class="xp-panel-title">แผนผังงบ — รายได้ / ค่าใช้จ่าย → หมวดหมู่รอง</div>
-        <div class="xp-panel-sub">ขนาดพื้นที่ = สัดส่วนจำนวนเงิน · คลิกหมวดเพื่อดูสัดส่วนใน Tab "ค้นหา/ตาราง"</div>
+        <div class="xp-panel-title">แผนผังงบ — รายได้ / ค่าใช้จ่าย → หมวดหมู่รอง → หมวดหมู่ย่อย → รายการ</div>
+        <div class="xp-panel-sub">ขนาดพื้นที่ = สัดส่วนจำนวนเงิน · คลิกกล่องเพื่อดูรายละเอียดลึกขึ้น</div>
+        <div class="xp-breadcrumb" id="ov-breadcrumb"></div>
         <div class="xp-treemap-wrap"><canvas id="ov-treemap"></canvas></div>
       </div>
       <div class="xp-panel">
@@ -322,6 +323,7 @@ document.querySelectorAll('.nav-item').forEach(el => {
 // ════════════════════════════════════════════════════════════
 let ovTreemapChart = null;
 let ovFy = 'fy2569';
+let treemapPath = []; // [] = root (cat1+cat2) · [cat1,cat2] = drilled to cat3 · [cat1,cat2,cat3] = drilled to item (leaf)
 
 function renderOverview() {
   const months = FY_MONTHS[ovFy];
@@ -383,23 +385,47 @@ function renderOverview() {
   renderPortCompare(months);
 }
 
+function renderBreadcrumb() {
+  const el = document.getElementById('ov-breadcrumb');
+  const crumbs = [{ label: 'ทั้งหมด', depth: 0 }];
+  if (treemapPath.length >= 2) crumbs.push({ label: treemapPath[0] + ' › ' + treemapPath[1], depth: 2 });
+  if (treemapPath.length >= 3) crumbs.push({ label: treemapPath[2], depth: 3 });
+  el.innerHTML = crumbs.map((c, i) => {
+    const last = i === crumbs.length - 1;
+    return `<span data-depth="${c.depth}" style="${last ? 'color:var(--blue2);' : ''}">${c.label}</span>` + (last ? '' : `<span class="sep">›</span>`);
+  }).join('');
+  el.querySelectorAll('span[data-depth]').forEach(s => {
+    s.addEventListener('click', () => {
+      treemapPath = treemapPath.slice(0, +s.dataset.depth);
+      renderTreemap(FY_MONTHS[ovFy]);
+    });
+  });
+}
+
 function renderTreemap(months) {
-  const rows = leafRows('กทท.');
+  const rows = leafRows('กทท.').filter(r =>
+    (treemapPath.length < 1 || r.cat1 === treemapPath[0]) &&
+    (treemapPath.length < 2 || r.cat2 === treemapPath[1]) &&
+    (treemapPath.length < 3 || r.cat3 === treemapPath[2])
+  );
+  const depth = treemapPath.length;
+  const fieldsAtDepth = depth === 0 ? ['cat1', 'cat2'] : depth === 2 ? ['cat3'] : ['item'];
+
   const agg = {};
   rows.forEach(r => {
-    const key = r.cat1 + ' › ' + r.cat2;
+    const key = fieldsAtDepth.map(f => r[f]).join(' › ');
     const val = Math.abs(sumRange(r[ovFy], months));
-    agg[key] = (agg[key] || 0) + val;
-    agg['__cat1__' + key] = r.cat1;
+    if (!agg[key]) agg[key] = { value: 0, cat1: r.cat1, cat2: r.cat2, cat3: r.cat3 };
+    agg[key].value += val;
   });
-  const tree = Object.keys(agg).filter(k => !k.startsWith('__')).map(k => ({
-    label: k,
-    cat1: agg['__cat1__' + k],
-    value: agg[k],
-  })).filter(d => d.value > 0);
+  const tree = Object.keys(agg).map(k => ({ label: k, value: agg[k].value, cat1: agg[k].cat1, cat2: agg[k].cat2, cat3: agg[k].cat3 }))
+    .filter(d => d.value > 0);
+
+  renderBreadcrumb();
 
   if (ovTreemapChart) ovTreemapChart.destroy();
   const ctx = document.getElementById('ov-treemap').getContext('2d');
+  const isLeaf = depth >= 3;
   ovTreemapChart = new Chart(ctx, {
     type: 'treemap',
     data: {
@@ -412,7 +438,8 @@ function renderTreemap(months) {
         borderColor: 'rgba(6,15,30,.6)',
         backgroundColor(ctx) {
           if (!ctx.raw || !ctx.raw._data) return 'rgba(59,130,246,.3)';
-          return ctx.raw._data.label.indexOf('รายได้') === 0 ? 'rgba(20,184,166,.55)' : 'rgba(59,130,246,.55)';
+          const cat1 = depth === 0 ? ctx.raw._data.label.split(' › ')[0] : ctx.raw._data.children[0].cat1;
+          return cat1 === 'รายได้' ? 'rgba(20,184,166,.55)' : 'rgba(59,130,246,.55)';
         },
         labels: {
           display: true,
@@ -421,7 +448,8 @@ function renderTreemap(months) {
           formatter(ctx) {
             if (!ctx.raw) return '';
             const v = ctx.raw.v;
-            return [ctx.raw._data.label.split(' › ')[1] || ctx.raw._data.label, (v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' ลบ.'];
+            const lbl = depth === 0 ? (ctx.raw._data.label.split(' › ')[1] || ctx.raw._data.label) : ctx.raw._data.label;
+            return [lbl, (v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' ลบ.'];
           },
         },
       }],
@@ -429,6 +457,18 @@ function renderTreemap(months) {
     options: {
       maintainAspectRatio: false,
       plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      onHover(evt, elements) { evt.native.target.style.cursor = (!isLeaf && elements.length) ? 'pointer' : 'default'; },
+      onClick(evt, elements) {
+        if (isLeaf || !elements.length) return;
+        const raw = ovTreemapChart.getDatasetMeta(0).data[elements[0].index].$context.raw;
+        if (depth === 0) {
+          const [c1, c2] = raw._data.label.split(' › ');
+          treemapPath = [c1, c2];
+        } else if (depth === 2) {
+          treemapPath = [treemapPath[0], treemapPath[1], raw._data.label];
+        }
+        setTimeout(() => renderTreemap(months), 0);
+      },
     },
   });
 }

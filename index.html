@@ -91,6 +91,20 @@ body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-h
 .pr-bar{height:100%;border-radius:3px;}
 .pr-val{font-size:12.5px;font-family:'Kanit',monospace;width:78px;text-align:right;flex-shrink:0;}
 
+/* revenue-share vs expense-share per port */
+.portshare-row{padding:10px 4px;border-bottom:1px solid var(--border);}
+.portshare-row:last-child{border-bottom:none;}
+.portshare-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:6px;}
+.portshare-name{font-size:13px;font-weight:600;color:var(--text);}
+.portshare-gap{font-size:11px;font-family:'Kanit',monospace;padding:1px 7px;border-radius:3px;}
+.ps-line{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.ps-tag{font-size:10.5px;color:var(--text3);width:62px;flex-shrink:0;}
+.ps-track{flex:1;height:9px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;}
+.ps-fill{height:100%;border-radius:3px;}
+.ps-fill.gold{background:linear-gradient(90deg,var(--gold),var(--gold2));}
+.ps-fill.rust{background:linear-gradient(90deg,var(--rust),var(--rust2));}
+.ps-pct{font-size:11.5px;font-family:'Kanit',monospace;width:46px;text-align:right;flex-shrink:0;}
+
 .xp-chart-canvas-wrap{position:relative;height:380px;}
 
 /* table */
@@ -206,6 +220,11 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
         <div class="year-tabs" id="tm-entity-tabs" style="margin:0 0 12px;justify-content:flex-start;"></div>
         <div class="xp-breadcrumb" id="ov-breadcrumb"></div>
         <div class="xp-treemap-wrap"><canvas id="ov-treemap"></canvas></div>
+      </div>
+      <div class="xp-panel">
+        <div class="xp-panel-title">สัดส่วนรายได้ vs ค่าใช้จ่าย ต่อท่าเรือ</div>
+        <div class="xp-panel-sub">% ของรายได้รวม และ % ของค่าใช้จ่ายรวม ของ 4 ท่าเรือ (ทกท./ทลฉ./ทรน./ทชส.) — ถ้าแถบค่าใช้จ่าย (แดง) ยาวกว่าแถบรายได้ (เหลือง) มาก แปลว่าท่าเรือนั้นแบกสัดส่วนต้นทุนมากกว่าสัดส่วนรายได้ที่ทำได้</div>
+        <div id="ov-portshare"></div>
       </div>
       <div class="xp-panel">
         <div class="xp-panel-title">เปรียบเทียบรายท่าเรือ — กำไรสุทธิ</div>
@@ -406,6 +425,7 @@ function renderOverview() {
   `;
 
   renderTreemap(months);
+  renderPortShare(months);
   renderPortCompare(months);
 }
 
@@ -512,6 +532,43 @@ function renderTreemap(months) {
       },
     },
   });
+}
+
+function renderPortShare(months) {
+  const data = PORTS.map(p => ({
+    name: p,
+    rev: entityTotals(p, ovFy, months, 'รายได้'),
+    exp: entityTotals(p, ovFy, months, 'ค่าใช้จ่าย'),
+  }));
+  const totalRev = data.reduce((s, d) => s + d.rev, 0);
+  const totalExp = data.reduce((s, d) => s + d.exp, 0);
+  data.forEach(d => {
+    d.revPct = totalRev ? d.rev / totalRev * 100 : 0;
+    d.expPct = totalExp ? d.exp / totalExp * 100 : 0;
+    d.gap = d.revPct - d.expPct;
+  });
+  data.sort((a, b) => b.revPct - a.revPct);
+
+  document.getElementById('ov-portshare').innerHTML = data.map(d => {
+    const gapCls = d.gap >= 0 ? 'up' : 'dn';
+    const gapTxt = (d.gap >= 0 ? '+' : '') + fmt(d.gap) + 'pp ' + (d.gap >= 0 ? 'รายได้นำ' : 'ค่าใช้จ่ายนำ');
+    return `<div class="portshare-row">
+      <div class="portshare-head">
+        <div class="portshare-name">${d.name}</div>
+        <div class="portshare-gap ${gapCls}">${gapTxt}</div>
+      </div>
+      <div class="ps-line">
+        <span class="ps-tag">รายได้</span>
+        <div class="ps-track"><div class="ps-fill gold" style="width:${d.revPct}%;"></div></div>
+        <span class="ps-pct">${fmt(d.revPct)}%</span>
+      </div>
+      <div class="ps-line">
+        <span class="ps-tag">ค่าใช้จ่าย</span>
+        <div class="ps-track"><div class="ps-fill rust" style="width:${d.expPct}%;"></div></div>
+        <span class="ps-pct">${fmt(d.expPct)}%</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderPortCompare(months) {

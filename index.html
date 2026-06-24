@@ -113,6 +113,29 @@ body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-h
 .xp-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
 .xp-filters select, .xp-filters input{background:var(--card);border:1px solid var(--border2);color:var(--text);font-family:'Kanit',sans-serif;font-size:12.5px;padding:7px 10px;border-radius:6px;}
 .xp-filters input{flex:1;min-width:180px;}
+
+/* faceted filter sidebar (Table tab) */
+.xf-layout{display:flex;gap:18px;align-items:flex-start;}
+.xf-sidebar{width:260px;flex-shrink:0;max-height:760px;overflow-y:auto;}
+.xf-section-title{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);margin-bottom:10px;}
+.xf-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+.xf-chip{padding:5px 10px;font-size:11.5px;border-radius:14px;border:1px solid var(--border2);color:var(--text2);cursor:pointer;background:transparent;transition:all .15s;}
+.xf-chip:hover{background:rgba(59,130,246,.08);}
+.xf-chip.active{background:rgba(223,171,80,.16);border-color:var(--gold);color:var(--gold2);}
+.xf-group{border-top:1px solid var(--border);padding:12px 0;}
+.xf-group:first-of-type{border-top:1px solid var(--border);margin-top:12px;}
+.xf-group-head{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text);user-select:none;}
+.xf-group-head:hover{color:var(--blue2);}
+.xf-chevron{font-size:9px;color:var(--text3);width:9px;flex-shrink:0;}
+.xf-count{margin-left:auto;font-size:11px;color:var(--text3);font-family:'Kanit',monospace;}
+.xf-group-body{margin-top:9px;}
+.xf-group.collapsed .xf-group-body{display:none;}
+.xf-search{width:100%;background:var(--card);border:1px solid var(--border2);color:var(--text);font-family:'Kanit',sans-serif;font-size:11.5px;padding:6px 9px;border-radius:5px;margin-bottom:8px;box-sizing:border-box;}
+.xf-checklist{max-height:190px;overflow-y:auto;display:flex;flex-direction:column;gap:6px;}
+.xf-check-row{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text2);cursor:pointer;}
+.xf-check-row input{accent-color:var(--gold);flex-shrink:0;}
+.xf-reset{margin-top:14px;width:100%;background:transparent;border:1px solid var(--border2);color:var(--text3);font-family:'Kanit',sans-serif;font-size:11.5px;padding:8px;border-radius:6px;cursor:pointer;transition:all .15s;}
+.xf-reset:hover{color:var(--rust2);border-color:var(--rust);}
 .xp-table-wrap{overflow:auto;max-height:560px;border:1px solid var(--border);border-radius:6px;}
 table.xp-table{width:100%;border-collapse:collapse;font-size:12.5px;}
 table.xp-table thead th{position:sticky;top:0;background:var(--panel);color:var(--text3);text-align:left;padding:9px 12px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border-bottom:1px solid var(--border2);white-space:nowrap;}
@@ -277,25 +300,58 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
       <div class="xp-pagetitle">ค้นหา / ตารางรายการละเอียด</div>
     </div>
     <div class="xp-body">
-      <div class="xp-panel">
-        <div class="xp-filters">
-          <select id="tbl-entity"><option value="">ทุกหน่วยงาน</option></select>
-          <select id="tbl-cat1"><option value="">รายได้ + ค่าใช้จ่าย</option></select>
-          <select id="tbl-fy"><option value="fy2569">FY2569 (8 เดือน)</option><option value="fy2568">FY2568 (8 เดือนแรก)</option></select>
-          <input id="tbl-search" type="text" placeholder="ค้นหารายการ / หมวดหมู่...">
+      <div class="xf-layout">
+        <div class="xp-panel xf-sidebar">
+          <div class="xf-section-title">จำนวนเงินขั้นต่ำของรายการ</div>
+          <div class="xf-chips" id="xf-amount-chips"></div>
+
+          <div class="xf-group" data-group="entity">
+            <div class="xf-group-head"><span class="xf-chevron">▾</span><span>หน่วยงาน</span><span class="xf-count" id="xf-count-entity"></span></div>
+            <div class="xf-group-body"><div class="xf-checklist" id="xf-body-entity"></div></div>
+          </div>
+
+          <div class="xf-group" data-group="cat1">
+            <div class="xf-group-head"><span class="xf-chevron">▾</span><span>หมวดหมู่หลัก</span><span class="xf-count" id="xf-count-cat1"></span></div>
+            <div class="xf-group-body"><div class="xf-checklist" id="xf-body-cat1"></div></div>
+          </div>
+
+          <div class="xf-group" data-group="cat2">
+            <div class="xf-group-head"><span class="xf-chevron">▾</span><span>หมวดหมู่รอง</span><span class="xf-count" id="xf-count-cat2"></span></div>
+            <div class="xf-group-body">
+              <input class="xf-search" id="xf-search-cat2" type="text" placeholder="ค้นหาหมวดหมู่รอง...">
+              <div class="xf-checklist" id="xf-body-cat2"></div>
+            </div>
+          </div>
+
+          <div class="xf-group collapsed" data-group="cat3">
+            <div class="xf-group-head"><span class="xf-chevron">▸</span><span>หมวดหมู่ย่อย</span><span class="xf-count" id="xf-count-cat3"></span></div>
+            <div class="xf-group-body">
+              <input class="xf-search" id="xf-search-cat3" type="text" placeholder="ค้นหาหมวดหมู่ย่อย...">
+              <div class="xf-checklist" id="xf-body-cat3"></div>
+            </div>
+          </div>
+
+          <button class="xf-reset" id="xf-reset">ล้างตัวกรองทั้งหมด</button>
         </div>
-        <div class="xp-table-wrap">
-          <table class="xp-table" id="line-table">
-            <thead><tr>
-              <th data-key="entity">หน่วยงาน</th>
-              <th data-key="cat1">หมวดหมู่หลัก</th>
-              <th data-key="cat2">หมวดหมู่รอง</th>
-              <th data-key="cat3">หมวดหมู่ย่อย</th>
-              <th data-key="item">รายการ</th>
-              <th data-key="amount" class="xp-num">จำนวนเงิน (บาท)</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table>
+
+        <div class="xp-panel" style="flex:1;min-width:0;">
+          <div class="xp-filters">
+            <select id="tbl-fy"><option value="fy2569">FY2569 (8 เดือน)</option><option value="fy2568">FY2568 (8 เดือนแรก)</option></select>
+            <input id="tbl-search" type="text" placeholder="ค้นหารายการ...">
+          </div>
+          <div class="xp-table-wrap">
+            <table class="xp-table" id="line-table">
+              <thead><tr>
+                <th data-key="entity">หน่วยงาน</th>
+                <th data-key="cat1">หมวดหมู่หลัก</th>
+                <th data-key="cat2">หมวดหมู่รอง</th>
+                <th data-key="cat3">หมวดหมู่ย่อย</th>
+                <th data-key="item">รายการ</th>
+                <th data-key="amount" class="xp-num">จำนวนเงิน (บาท)</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
@@ -786,22 +842,98 @@ function buildLineItems() {
 }
 const ALL_LINES = buildLineItems();
 
-function populateTableFilters() {
-  const entitySel = document.getElementById('tbl-entity');
-  PAT_DATA.entities.forEach(e => entitySel.insertAdjacentHTML('beforeend', `<option value="${e}">${e}</option>`));
-  const cat1Sel = document.getElementById('tbl-cat1');
-  ['รายได้', 'ค่าใช้จ่าย'].forEach(c => cat1Sel.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`));
+const tblFilters = { minAmount: 0, entity: new Set(), cat1: new Set(), cat2: new Set(), cat3: new Set() };
+
+function renderChecklist(groupKey, allValues, container, searchTerm) {
+  const filtered = searchTerm ? allValues.filter(v => v.toLowerCase().includes(searchTerm.toLowerCase())) : allValues;
+  container.innerHTML = filtered.map(v => `
+    <label class="xf-check-row">
+      <input type="checkbox" value="${v}"${tblFilters[groupKey].has(v) ? ' checked' : ''}>
+      <span>${v}</span>
+    </label>`).join('');
+  container.querySelectorAll('input').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if (cb.checked) tblFilters[groupKey].add(cb.value);
+      else tblFilters[groupKey].delete(cb.value);
+      renderTable();
+    });
+  });
+}
+
+function initTableFilters() {
+  const entities = PAT_DATA.entities;
+  const cat1s = ['รายได้', 'ค่าใช้จ่าย'];
+  const cat2s = [...new Set(ALL_LINES.map(r => r.cat2))].sort();
+  const cat3s = [...new Set(ALL_LINES.map(r => r.cat3))].sort();
+
+  tblFilters.entity = new Set(entities);
+  tblFilters.cat1 = new Set(cat1s);
+  tblFilters.cat2 = new Set(cat2s);
+  tblFilters.cat3 = new Set(cat3s);
+
+  document.getElementById('xf-count-entity').textContent = entities.length;
+  document.getElementById('xf-count-cat1').textContent = cat1s.length;
+  document.getElementById('xf-count-cat2').textContent = cat2s.length;
+  document.getElementById('xf-count-cat3').textContent = cat3s.length;
+
+  const cat2Body = document.getElementById('xf-body-cat2');
+  const cat3Body = document.getElementById('xf-body-cat3');
+  renderChecklist('entity', entities, document.getElementById('xf-body-entity'));
+  renderChecklist('cat1', cat1s, document.getElementById('xf-body-cat1'));
+  renderChecklist('cat2', cat2s, cat2Body);
+  renderChecklist('cat3', cat3s, cat3Body);
+
+  document.getElementById('xf-search-cat2').addEventListener('input', e => renderChecklist('cat2', cat2s, cat2Body, e.target.value));
+  document.getElementById('xf-search-cat3').addEventListener('input', e => renderChecklist('cat3', cat3s, cat3Body, e.target.value));
+
+  const chipDefs = [
+    { label: 'ทั้งหมด', value: 0 },
+    { label: '≥1 แสนบาท', value: 1e5 },
+    { label: '≥1 ล้านบาท', value: 1e6 },
+    { label: '≥10 ล้านบาท', value: 1e7 },
+    { label: '≥100 ล้านบาท', value: 1e8 },
+  ];
+  document.getElementById('xf-amount-chips').innerHTML = chipDefs.map((c, i) =>
+    `<div class="xf-chip${i === 0 ? ' active' : ''}" data-value="${c.value}">${c.label}</div>`).join('');
+  document.querySelectorAll('#xf-amount-chips .xf-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#xf-amount-chips .xf-chip').forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      tblFilters.minAmount = Number(chip.dataset.value);
+      renderTable();
+    });
+  });
+
+  document.querySelectorAll('.xf-group-head').forEach(head => {
+    head.addEventListener('click', () => head.closest('.xf-group').classList.toggle('collapsed'));
+  });
+
+  document.getElementById('xf-reset').addEventListener('click', () => {
+    tblFilters.entity = new Set(entities);
+    tblFilters.cat1 = new Set(cat1s);
+    tblFilters.cat2 = new Set(cat2s);
+    tblFilters.cat3 = new Set(cat3s);
+    tblFilters.minAmount = 0;
+    document.querySelectorAll('#xf-amount-chips .xf-chip').forEach((c, i) => c.classList.toggle('active', i === 0));
+    renderChecklist('entity', entities, document.getElementById('xf-body-entity'));
+    renderChecklist('cat1', cat1s, document.getElementById('xf-body-cat1'));
+    renderChecklist('cat2', cat2s, cat2Body);
+    renderChecklist('cat3', cat3s, cat3Body);
+    document.getElementById('tbl-search').value = '';
+    renderTable();
+  });
 }
 
 function renderTable() {
-  const entity = document.getElementById('tbl-entity').value;
-  const cat1 = document.getElementById('tbl-cat1').value;
   const fy = document.getElementById('tbl-fy').value;
   const search = document.getElementById('tbl-search').value.trim().toLowerCase();
 
   let rows = ALL_LINES.filter(r => {
-    if (entity && r.entity !== entity) return false;
-    if (cat1 && r.cat1 !== cat1) return false;
+    if (!tblFilters.entity.has(r.entity)) return false;
+    if (!tblFilters.cat1.has(r.cat1)) return false;
+    if (!tblFilters.cat2.has(r.cat2)) return false;
+    if (!tblFilters.cat3.has(r.cat3)) return false;
+    if (Math.abs(r[fy]) < tblFilters.minAmount) return false;
     if (search && !(r.item + r.cat2 + r.cat3).toLowerCase().includes(search)) return false;
     return true;
   }).map(r => ({ ...r, amount: r[fy] }));
@@ -843,14 +975,14 @@ document.querySelectorAll('#line-table thead th').forEach(th => {
     renderTable();
   });
 });
-['tbl-entity', 'tbl-cat1', 'tbl-fy', 'tbl-search'].forEach(id => {
+['tbl-fy', 'tbl-search'].forEach(id => {
   document.getElementById(id).addEventListener('input', renderTable);
 });
 
 // ════════════════════════════════════════════════════════════
 // INIT
 // ════════════════════════════════════════════════════════════
-populateTableFilters();
+initTableFilters();
 renderOverview();
 renderCompare();
 renderTable();

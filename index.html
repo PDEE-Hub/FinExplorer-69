@@ -268,7 +268,8 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
   <div class="view-page" id="view-compare">
     <div class="score-strip-simple" id="cmp-kpis" style="grid-template-columns:repeat(3,1fr);"></div>
     <div class="xp-pageheader">
-      <div class="xp-pagetitle">เทียบรายปี (Year-over-Year) — กทท. ทั้งองค์กร · 8 เดือนแรก FY2568 vs FY2569</div>
+      <div class="xp-pagetitle">เทียบรายปี (Year-over-Year) — <span id="cmp-entity-label">กทท. (ทั้งองค์กร)</span> · 8 เดือนแรก FY2568 vs FY2569</div>
+      <div class="year-tabs" id="cmp-entity-tabs"></div>
     </div>
     <div class="xp-body">
       <div class="xp-panel">
@@ -293,12 +294,11 @@ table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
       </div>
       <div class="xp-panel">
         <div class="xp-panel-title">รายการที่เปลี่ยนแปลงมากที่สุด — ระดับรายการย่อย</div>
-        <div class="xp-panel-sub">เจาะลึกถึงรายการเดี่ยวของ ทกท./ทลฉ./ทรน./ทชส. (ไม่รวม กทท. ส่วนกลาง) เทียบ 8 เดือนแรก FY2568 vs FY2569 — แยกตามหน่วยงานเพราะกิจกรรมชื่อเดียวกันอาจเกิดที่หลายท่าเรือ</div>
+        <div class="xp-panel-sub">เจาะลึกถึงรายการเดี่ยว (ไม่ใช่หมวดรวม) ของ <span id="cmp-item-entity-label">กทท. (ทั้งองค์กร)</span> เทียบ 8 เดือนแรก FY2568 vs FY2569</div>
         <div class="xf-chips" id="cmp-item-tabs" style="margin-bottom:14px;"></div>
         <div class="xp-table-wrap">
           <table class="xp-table" id="cmp-item-table">
             <thead><tr>
-              <th>หน่วยงาน</th>
               <th>รายการ</th>
               <th class="xp-num">FY2568 (8mo)</th>
               <th class="xp-num">FY2569 (8mo)</th>
@@ -769,12 +769,30 @@ document.querySelectorAll('#ov-year-tabs .ytab').forEach(el => {
 // ════════════════════════════════════════════════════════════
 let cmpDivChart = null;
 
+let cmpEntity = 'กทท.';
+
+function renderCompareEntityTabs() {
+  const wrap = document.getElementById('cmp-entity-tabs');
+  wrap.innerHTML = ['กทท.', ...PORTS].map(e =>
+    `<div class="ytab${e === cmpEntity ? ' active' : ''}" data-entity="${e}">${TREEMAP_ENTITY_LABEL[e]}</div>`
+  ).join('');
+  wrap.querySelectorAll('.ytab').forEach(el => {
+    el.addEventListener('click', () => {
+      cmpEntity = el.dataset.entity;
+      renderCompare();
+    });
+  });
+  document.getElementById('cmp-entity-label').textContent = TREEMAP_ENTITY_LABEL[cmpEntity];
+  document.getElementById('cmp-item-entity-label').textContent = TREEMAP_ENTITY_LABEL[cmpEntity];
+}
+
 function renderCompare() {
+  renderCompareEntityTabs();
   const months = 8;
-  const rev69 = entityTotals('กทท.', 'fy2569', months, 'รายได้');
-  const rev68 = entityTotals('กทท.', 'fy2568', months, 'รายได้');
-  const exp69 = entityTotals('กทท.', 'fy2569', months, 'ค่าใช้จ่าย');
-  const exp68 = entityTotals('กทท.', 'fy2568', months, 'ค่าใช้จ่าย');
+  const rev69 = entityTotals(cmpEntity, 'fy2569', months, 'รายได้');
+  const rev68 = entityTotals(cmpEntity, 'fy2568', months, 'รายได้');
+  const exp69 = entityTotals(cmpEntity, 'fy2569', months, 'ค่าใช้จ่าย');
+  const exp68 = entityTotals(cmpEntity, 'fy2568', months, 'ค่าใช้จ่าย');
   const net69 = rev69 - exp69, net68 = rev68 - exp68;
 
   function kpiCard(label, v68, v69, colorClass, colorVar) {
@@ -793,7 +811,7 @@ function renderCompare() {
     kpiCard('กำไรสุทธิ 8 เดือน', net68, net69, 'forest', 'var(--forest2)');
 
   // group by cat1>cat2
-  const rows = leafRows('กทท.');
+  const rows = leafRows(cmpEntity);
   const byCat = {};
   rows.forEach(r => {
     const key = r.cat1 + ' › ' + r.cat2;
@@ -854,21 +872,18 @@ let cmpItemTab = 'up';
 function buildItemChanges() {
   const months = 8;
   const out = [];
-  PORTS.forEach(entity => {
-    leafRows(entity).forEach(r => {
-      const fy2568 = sumRange(r.fy2568, months);
-      const fy2569 = sumRange(r.fy2569, months);
-      if (fy2568 === 0 && fy2569 === 0) return;
-      out.push({
-        entity,
-        label: r.item,
-        breadcrumb: r.cat1 + ' › ' + r.cat2 + ' › ' + r.cat3,
-        fy2568, fy2569,
-        delta: fy2569 - fy2568,
-        deltaPct: fy2568 ? (fy2569 - fy2568) / Math.abs(fy2568) * 100 : null,
-        isNew: fy2568 === 0 && fy2569 !== 0,
-        isCut: fy2568 !== 0 && fy2569 === 0,
-      });
+  leafRows(cmpEntity).forEach(r => {
+    const fy2568 = sumRange(r.fy2568, months);
+    const fy2569 = sumRange(r.fy2569, months);
+    if (fy2568 === 0 && fy2569 === 0) return;
+    out.push({
+      label: r.item,
+      breadcrumb: r.cat1 + ' › ' + r.cat2 + ' › ' + r.cat3,
+      fy2568, fy2569,
+      delta: fy2569 - fy2568,
+      deltaPct: fy2568 ? (fy2569 - fy2568) / Math.abs(fy2568) * 100 : null,
+      isNew: fy2568 === 0 && fy2569 !== 0,
+      isCut: fy2568 !== 0 && fy2569 === 0,
     });
   });
   return out;
@@ -901,14 +916,13 @@ function renderItemChanges() {
 
   const tbody = document.querySelector('#cmp-item-table tbody');
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="6"><div class="xp-empty">ไม่มีรายการในกลุ่มนี้</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><div class="xp-empty">ไม่มีรายการในกลุ่มนี้</div></td></tr>`;
     return;
   }
   tbody.innerHTML = list.map(d => {
     const color = d.isNew ? 'var(--gold2)' : d.isCut ? 'var(--rust2)' : (d.delta >= 0 ? 'var(--green2)' : 'var(--red2)');
     const pctCell = d.isNew ? 'ใหม่' : d.isCut ? 'ตัด' : fmtSigned(d.deltaPct) + '%';
     return `<tr>
-      <td style="white-space:nowrap;font-weight:600;">${d.entity}</td>
       <td>${d.label}<div style="font-size:10.5px;color:var(--text3);margin-top:2px;">${d.breadcrumb}</div></td>
       <td class="xp-num">${d.fy2568 ? fmt(d.fy2568 / 1e6) : '–'}</td>
       <td class="xp-num">${d.fy2569 ? fmt(d.fy2569 / 1e6) : '–'}</td>

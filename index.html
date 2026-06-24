@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PAT Financial Explorer — กทท. FY2569</title>
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap@2/dist/chartjs-chart-treemap.min.js"></script>
+<style>
+:root{
+  --bg:#060f1e; --bg2:#0a1628; --panel:#0f1f38; --card:#152540;
+  --border:rgba(59,130,246,.12); --border2:rgba(59,130,246,.22);
+  --text:#edf2fc; --text2:#b4cce8; --text3:#5a7a9a;
+  --teal:#14b8a6; --teal2:#2dd4bf;
+  --blue:#3b82f6; --blue2:#60a5fa;
+  --amber:#f59e0b; --amber2:#fbbf24;
+  --red:#ef4444; --red2:#f87171;
+  --green:#10b981; --green2:#34d399;
+  --purple:#8b5cf6; --purple2:#a78bfa;
+  --coral:#e85c4a;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{font-family:'Kanit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px;display:flex;flex-direction:column;}
+
+/* ══ SHELL (same pattern as Fintrix) ══ */
+.app-shell{display:flex;height:100vh;overflow:hidden;}
+.sidebar{width:200px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border2);display:flex;flex-direction:column;overflow:hidden;}
+.sidebar-logo{padding:16px 16px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.sl-title{font-size:15px;font-weight:700;letter-spacing:.04em;color:var(--teal2);line-height:1.2;}
+.sl-sub{font-size:9px;color:#5a7a9a;margin-top:2px;letter-spacing:.04em;}
+.sidebar-nav{flex:1;overflow-y:auto;padding:8px 0;}
+.nav-section{font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:#3d5570;padding:10px 16px 4px;font-weight:600;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;transition:all .15s;border-left:3px solid transparent;position:relative;}
+.nav-item:hover{background:rgba(59,130,246,.06);color:var(--text);}
+.nav-item.active{background:rgba(59,130,246,.1);border-left-color:var(--blue);color:var(--blue2);}
+.nav-item.active .nav-icon{opacity:1;}
+.nav-icon{font-size:15px;flex-shrink:0;opacity:.65;}
+.nav-label{font-size:11px;font-weight:500;line-height:1.35;}
+.nav-sublabel{font-size:9px;color:#5a7a9a;margin-top:1px;}
+.sidebar-footer{padding:12px 14px;border-top:1px solid var(--border);font-size:9px;color:#3d5570;line-height:1.6;flex-shrink:0;}
+.app-main{flex:1;overflow-y:auto;display:flex;flex-direction:column;}
+.view-page{display:none;flex:1;flex-direction:column;}
+.view-page.active{display:flex;}
+
+/* ══ SCORE CARDS (same .sc pattern as Fintrix) ══ */
+.score-strip-simple{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border-bottom:1px solid var(--border2);flex-shrink:0;}
+.sc{background:var(--bg2);padding:14px 18px;position:relative;overflow:hidden;}
+.sc::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.sc.teal::after{background:linear-gradient(90deg,var(--teal),var(--teal2));}
+.sc.blue::after{background:linear-gradient(90deg,var(--blue),var(--blue2));}
+.sc.amber::after{background:linear-gradient(90deg,var(--amber),var(--amber2));}
+.sc.green::after{background:linear-gradient(90deg,var(--green),var(--green2));}
+.sc-label{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#7a9ab8;margin-bottom:4px;}
+.sc-val{font-size:22px;font-weight:700;font-family:'Kanit',monospace;letter-spacing:-.03em;line-height:1;}
+.sc-sub{font-size:12px;color:var(--text2);margin-top:5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.sc-delta{font-size:12px;font-family:'Kanit',monospace;font-weight:600;padding:1px 5px;border-radius:3px;}
+.up{color:var(--green2);background:rgba(16,185,129,.12);}
+.dn{color:var(--red2);background:rgba(239,68,68,.12);}
+
+/* ══ PAGE CHROME ══ */
+.xp-pageheader{display:flex;align-items:center;gap:12px;padding:16px 22px 0;flex-wrap:wrap;}
+.xp-pagetitle{font-size:15px;font-weight:600;color:var(--text);}
+.year-tabs{display:flex;gap:2px;margin-left:auto;}
+.ytab{padding:5px 12px;font-size:12px;border-radius:4px;cursor:pointer;background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:'Kanit',sans-serif;transition:all .15s;}
+.ytab:hover{background:rgba(59,130,246,.1);}
+.ytab.active{background:rgba(59,130,246,.18);border-color:var(--blue);color:var(--blue2);}
+.xp-body{padding:18px 22px;display:flex;flex-direction:column;gap:18px;}
+.xp-panel{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:18px 20px;}
+.xp-panel-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.xp-panel-sub{font-size:11px;color:var(--text3);margin-bottom:14px;}
+.xp-breadcrumb{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text3);margin-bottom:10px;flex-wrap:wrap;}
+.xp-breadcrumb span{cursor:pointer;}
+.xp-breadcrumb span:hover{color:var(--blue2);}
+.xp-breadcrumb .sep{cursor:default;opacity:.5;}
+.xp-treemap-wrap{position:relative;height:420px;}
+
+/* ranked horizontal bar list (port comparison / pareto-style) */
+.pareto-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;border-radius:4px;padding:4px;}
+.pr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.pr-name{font-size:12.5px;color:var(--text2);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pr-bar-wrap{width:140px;height:7px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;flex-shrink:0;}
+.pr-bar{height:100%;border-radius:3px;}
+.pr-val{font-size:12.5px;font-family:'Kanit',monospace;width:78px;text-align:right;flex-shrink:0;}
+
+.xp-chart-canvas-wrap{position:relative;height:380px;}
+
+/* table */
+.xp-filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.xp-filters select, .xp-filters input{background:var(--card);border:1px solid var(--border2);color:var(--text);font-family:'Kanit',sans-serif;font-size:12.5px;padding:7px 10px;border-radius:6px;}
+.xp-filters input{flex:1;min-width:180px;}
+.xp-table-wrap{overflow:auto;max-height:560px;border:1px solid var(--border);border-radius:6px;}
+table.xp-table{width:100%;border-collapse:collapse;font-size:12.5px;}
+table.xp-table thead th{position:sticky;top:0;background:var(--panel);color:var(--text3);text-align:left;padding:9px 12px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;border-bottom:1px solid var(--border2);white-space:nowrap;}
+table.xp-table thead th:hover{color:var(--blue2);}
+table.xp-table tbody td{padding:8px 12px;border-bottom:1px solid var(--border);color:var(--text2);position:relative;}
+table.xp-table tbody tr:hover td{background:rgba(59,130,246,.05);}
+.xp-num{font-family:'Kanit',monospace;text-align:right;white-space:nowrap;}
+.xp-bar-fill{position:absolute;left:0;top:0;bottom:0;opacity:.16;z-index:0;}
+.xp-cell-text{position:relative;z-index:1;}
+.xp-empty{color:var(--text3);text-align:center;padding:30px;font-size:13px;}
+
+/* ══ PIN GATE (identical to Fintrix) ══ */
+#pat-gate-overlay{position:fixed;inset:0;z-index:99999;background:#060f1e;display:flex;align-items:center;justify-content:center;font-family:'Kanit','Sarabun',sans-serif;}
+.pat-gate-box{background:#0f1f38;border:1px solid rgba(59,130,246,.22);border-radius:14px;padding:36px 32px;max-width:380px;width:90%;text-align:center;}
+.pat-gate-mark{width:48px;height:48px;border-radius:10px;background:#2c5f8a;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;margin:0 auto 16px;font-family:'Kanit',sans-serif;}
+.pat-gate-title{color:#edf2fc;font-size:18px;font-weight:600;margin-bottom:4px;}
+.pat-gate-sub{color:#5a7a9a;font-size:12px;margin-bottom:18px;}
+.pat-gate-step{display:none;}
+.pat-gate-step.active{display:block;}
+.pat-gate-code-input{width:100%;padding:12px;border-radius:8px;border:1px solid rgba(59,130,246,.22);background:#152540;color:#edf2fc;font-size:20px;text-align:center;letter-spacing:.4em;font-family:'Kanit',monospace;margin-bottom:12px;box-sizing:border-box;}
+.pat-gate-btn{width:100%;padding:11px;border-radius:8px;border:none;background:#14b8a6;color:#06281f;font-weight:600;font-size:14px;cursor:pointer;font-family:'Kanit',sans-serif;}
+.pat-gate-error{color:#f87171;font-size:12px;margin-top:10px;}
+.pat-gate-step .pat-gate-error{display:none;}
+.pat-gate-step .pat-gate-error.show{display:block;}
+.pat-gate-footer{margin-top:16px;color:#5a7a9a;font-size:10.5px;}
+.pat-gate-emailtag{color:#2dd4bf;font-size:11.5px;margin-bottom:14px;}
+::-webkit-scrollbar{width:4px;height:4px;}
+</style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+
+<div id="pat-gate-overlay">
+  <div class="pat-gate-box">
+    <div class="pat-gate-mark">PAT</div>
+    <div class="pat-gate-title">Internal Access</div>
+    <div class="pat-gate-sub">เฉพาะอีเมล์ @port.co.th เท่านั้น</div>
+
+    <div class="pat-gate-step active" id="pat-gate-step-email">
+      <div id="pat-g-btn-wrap" style="display:flex;justify-content:center;">
+        <div id="g_id_onload"
+          data-client_id="850818349851-ukh2ldprhknc44e2c5sij0fbnjr2c6fd.apps.googleusercontent.com"
+          data-callback="patHandleCredential"
+          data-auto_prompt="false"></div>
+        <div class="g_id_signin" data-type="standard" data-size="large" data-theme="outline" data-text="sign_in_with" data-shape="rectangular" data-logo_alignment="left"></div>
+      </div>
+      <div class="pat-gate-error" id="pat-gate-email-error">⛔ อีเมล์นี้ไม่ได้รับอนุญาต ใช้ @port.co.th เท่านั้น</div>
+    </div>
+
+    <div class="pat-gate-step" id="pat-gate-step-code">
+      <div class="pat-gate-emailtag" id="pat-gate-email-display"></div>
+      <input type="password" inputmode="numeric" maxlength="8" class="pat-gate-code-input" id="pat-gate-code" placeholder="•••••" autocomplete="off">
+      <button class="pat-gate-btn" onclick="patCheckCode()">เข้าใช้งาน</button>
+      <div class="pat-gate-error" id="pat-gate-code-error">⛔ รหัสไม่ถูกต้อง</div>
+    </div>
+
+    <div class="pat-gate-footer">Internal Use Only · กองประเมินผลองค์กร กทท.</div>
+  </div>
+</div>
+
+<div id="pat-main-content" style="display:none;">
+<div class="app-shell">
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sl-title">PAT Financial Explorer</div>
+    <div class="sl-sub" style="font-weight:700;color:#fff;font-size:10.5px;margin-top:3px;">FY2569 · 8 เดือน</div>
+  </div>
+  <div class="sidebar-nav">
+    <div class="nav-section">สำรวจงบ กทท.</div>
+    <div class="nav-item active" data-view="overview">
+      <div class="nav-icon">🗺</div>
+      <div><div class="nav-label">ภาพรวมองค์กร</div><div class="nav-sublabel">Treemap · กทท.</div></div>
+    </div>
+    <div class="nav-item" data-view="compare">
+      <div class="nav-icon">⇅</div>
+      <div><div class="nav-label">เทียบรายปี</div><div class="nav-sublabel">YoY 2568→2569</div></div>
+    </div>
+    <div class="nav-item" data-view="table">
+      <div class="nav-icon">🔎</div>
+      <div><div class="nav-label">ค้นหา/ตาราง</div><div class="nav-sublabel">รายการละเอียด</div></div>
+    </div>
+  </div>
+  <div class="sidebar-footer">
+    ข้อมูล: Power_BI_8_Months_69.xlsx<br>
+    อัปเดต: พ.ค. 2569<br>
+    <span style="color:#14b8a6;">● Live Dashboard</span>
+  </div>
+</div>
+
+<div class="app-main">
+
+  <!-- ══ VIEW: OVERVIEW ══ -->
+  <div class="view-page active" id="view-overview">
+    <div class="score-strip-simple" id="ov-kpis"></div>
+    <div class="xp-pageheader">
+      <div class="xp-pagetitle">ภาพรวมงบการเงิน กทท. (ทั้งองค์กร)</div>
+      <div class="year-tabs" id="ov-year-tabs">
+        <div class="ytab active" data-fy="fy2569">FY2569 (8 เดือน)</div>
+        <div class="ytab" data-fy="fy2568">FY2568 (เต็มปี)</div>
+      </div>
+    </div>
+    <div class="xp-body">
+      <div class="xp-panel">
+        <div class="xp-panel-title">แผนผังงบ — รายได้ / ค่าใช้จ่าย → หมวดหมู่รอง</div>
+        <div class="xp-panel-sub">ขนาดพื้นที่ = สัดส่วนจำนวนเงิน · คลิกหมวดเพื่อดูสัดส่วนใน Tab "ค้นหา/ตาราง"</div>
+        <div class="xp-treemap-wrap"><canvas id="ov-treemap"></canvas></div>
+      </div>
+      <div class="xp-panel">
+        <div class="xp-panel-title">เปรียบเทียบรายท่าเรือ — กำไรสุทธิ</div>
+        <div class="xp-panel-sub">ทกท. / ทลฉ. / ทรน. / ทชส. — มุมมองแยกต่างหาก ไม่ได้รวมอยู่ใน กทท. ข้างบน</div>
+        <div id="ov-ports"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VIEW: COMPARE YoY ══ -->
+  <div class="view-page" id="view-compare">
+    <div class="score-strip-simple" id="cmp-kpis" style="grid-template-columns:repeat(3,1fr);"></div>
+    <div class="xp-pageheader">
+      <div class="xp-pagetitle">เทียบรายปี (Year-over-Year) — กทท. ทั้งองค์กร · 8 เดือนแรก FY2568 vs FY2569</div>
+    </div>
+    <div class="xp-body">
+      <div class="xp-panel">
+        <div class="xp-panel-title">การเปลี่ยนแปลงตามหมวดหมู่รอง — เรียงตามขนาดการเปลี่ยนแปลง</div>
+        <div class="xp-panel-sub">เขียว = เพิ่มขึ้น · แดง = ลดลง (เทียบ 8 เดือนแรกปีก่อนหน้า)</div>
+        <div class="xp-chart-canvas-wrap"><canvas id="cmp-divbar"></canvas></div>
+      </div>
+      <div class="xp-panel">
+        <div class="xp-panel-title">ตารางรายละเอียด</div>
+        <div class="xp-table-wrap">
+          <table class="xp-table" id="cmp-table">
+            <thead><tr>
+              <th data-key="label">หมวดหมู่</th>
+              <th data-key="fy2568" class="xp-num">FY2568 (8mo)</th>
+              <th data-key="fy2569" class="xp-num">FY2569 (8mo)</th>
+              <th data-key="delta" class="xp-num">Δ บาท</th>
+              <th data-key="deltaPct" class="xp-num">Δ %</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ VIEW: TABLE/SEARCH ══ -->
+  <div class="view-page" id="view-table">
+    <div class="xp-pageheader" style="padding-top:18px;">
+      <div class="xp-pagetitle">ค้นหา / ตารางรายการละเอียด</div>
+    </div>
+    <div class="xp-body">
+      <div class="xp-panel">
+        <div class="xp-filters">
+          <select id="tbl-entity"><option value="">ทุกหน่วยงาน</option></select>
+          <select id="tbl-cat1"><option value="">รายได้ + ค่าใช้จ่าย</option></select>
+          <select id="tbl-fy"><option value="fy2569">FY2569 (8 เดือน)</option><option value="fy2568">FY2568 (8 เดือนแรก)</option></select>
+          <input id="tbl-search" type="text" placeholder="ค้นหารายการ / หมวดหมู่...">
+        </div>
+        <div class="xp-table-wrap">
+          <table class="xp-table" id="line-table">
+            <thead><tr>
+              <th data-key="entity">หน่วยงาน</th>
+              <th data-key="cat1">หมวดหมู่หลัก</th>
+              <th data-key="cat2">หมวดหมู่รอง</th>
+              <th data-key="cat3">หมวดหมู่ย่อย</th>
+              <th data-key="item">รายการ</th>
+              <th data-key="amount" class="xp-num">จำนวนเงิน (บาท)</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+</div>
+
+<script src="pat_data.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════
+// DATA HELPERS
+// ════════════════════════════════════════════════════════════
+const FY_MONTHS = { fy2568: 12, fy2569: 8 };
+const FY_LABEL_TH = { fy2568: 'FY2568', fy2569: 'FY2569' };
+const PORTS = ['ทกท.', 'ทลฉ.', 'ทรน.', 'ทชส.'];
+const fmt = n => n.toLocaleString('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const fmtSigned = n => (n >= 0 ? '+' : '') + fmt(n);
+
+function leafRows(entity) {
+  // flatten tree[entity] into [{cat1,cat2,cat3,item,fy2568:[12],fy2569:[12]}]
+  const cats = PAT_DATA.tree[entity];
+  const out = [];
+  if (!cats) return out;
+  for (const cat1 in cats) for (const cat2 in cats[cat1]) for (const cat3 in cats[cat1][cat2]) for (const item in cats[cat1][cat2][cat3]) {
+    const node = cats[cat1][cat2][cat3][item];
+    out.push({ cat1, cat2, cat3, item, fy2568: node.fy2568 || new Array(12).fill(0), fy2569: node.fy2569 || new Array(12).fill(0) });
+  }
+  return out;
+}
+
+function sumRange(arr, months) { return arr.slice(0, months).reduce((a, b) => a + b, 0); }
+
+function entityTotals(entity, fyLabel, months, cat1Filter) {
+  return leafRows(entity)
+    .filter(r => !cat1Filter || r.cat1 === cat1Filter)
+    .reduce((sum, r) => sum + sumRange(r[fyLabel], months), 0);
+}
+
+function entityNet(entity, fyLabel, months) {
+  return entityTotals(entity, fyLabel, months, 'รายได้') - entityTotals(entity, fyLabel, months, 'ค่าใช้จ่าย');
+}
+
+// ════════════════════════════════════════════════════════════
+// NAV
+// ════════════════════════════════════════════════════════════
+document.querySelectorAll('.nav-item').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    document.querySelectorAll('.view-page').forEach(v => v.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('view-' + el.dataset.view).classList.add('active');
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+// OVERVIEW TAB
+// ════════════════════════════════════════════════════════════
+let ovTreemapChart = null;
+let ovFy = 'fy2569';
+
+function renderOverview() {
+  const months = FY_MONTHS[ovFy];
+  const rev = entityTotals('กทท.', ovFy, months, 'รายได้');
+  const exp = entityTotals('กทท.', ovFy, months, 'ค่าใช้จ่าย');
+  const net = rev - exp;
+  const margin = rev ? (net / rev * 100) : 0;
+
+  let deltaHtml = '';
+  if (ovFy === 'fy2569') {
+    const prevRev = entityTotals('กทท.', 'fy2568', months, 'รายได้');
+    const prevExp = entityTotals('กทท.', 'fy2568', months, 'ค่าใช้จ่าย');
+    const prevNet = prevRev - prevExp;
+    deltaHtml = {
+      rev: pctChip(rev, prevRev),
+      exp: pctChip(exp, prevExp),
+      net: pctChip(net, prevNet),
+    };
+  }
+
+  function pctChip(cur, prev) {
+    if (!prev) return '';
+    const pct = (cur - prev) / Math.abs(prev) * 100;
+    const cls = pct >= 0 ? 'up' : 'dn';
+    const arrow = pct >= 0 ? '▲' : '▼';
+    return `<span class="sc-delta ${cls}">${arrow} ${fmtSigned(pct)}% YoY</span>`;
+  }
+
+  const ch = ovFy === 'fy2569' ? {
+    rev: pctChip(rev, entityTotals('กทท.', 'fy2568', months, 'รายได้')),
+    exp: pctChip(exp, entityTotals('กทท.', 'fy2568', months, 'ค่าใช้จ่าย')),
+    net: pctChip(net, entityNet('กทท.', 'fy2568', months)),
+  } : { rev: '', exp: '', net: '' };
+
+  document.getElementById('ov-kpis').innerHTML = `
+    <div class="sc teal">
+      <div class="sc-label">รายได้รวม · ${FY_LABEL_TH[ovFy]}</div>
+      <div class="sc-val" style="color:var(--teal2);">${fmt(rev / 1e6)}</div>
+      <div class="sc-sub"><span style="color:var(--text3);">ล้านบาท</span>${ch.rev}</div>
+    </div>
+    <div class="sc blue">
+      <div class="sc-label">ค่าใช้จ่ายรวม · ${FY_LABEL_TH[ovFy]}</div>
+      <div class="sc-val" style="color:var(--blue2);">${fmt(exp / 1e6)}</div>
+      <div class="sc-sub"><span style="color:var(--text3);">ล้านบาท</span>${ch.exp}</div>
+    </div>
+    <div class="sc amber">
+      <div class="sc-label">กำไรสุทธิ · ${FY_LABEL_TH[ovFy]}</div>
+      <div class="sc-val" style="color:var(--amber2);">${fmt(net / 1e6)}</div>
+      <div class="sc-sub"><span style="color:var(--text3);">ล้านบาท</span>${ch.net}</div>
+    </div>
+    <div class="sc green">
+      <div class="sc-label">Net Margin</div>
+      <div class="sc-val" style="color:var(--green2);">${fmt(margin)}%</div>
+      <div class="sc-sub"><span style="color:var(--text3);">กำไร / รายได้</span></div>
+    </div>
+  `;
+
+  renderTreemap(months);
+  renderPortCompare(months);
+}
+
+function renderTreemap(months) {
+  const rows = leafRows('กทท.');
+  const agg = {};
+  rows.forEach(r => {
+    const key = r.cat1 + ' › ' + r.cat2;
+    const val = Math.abs(sumRange(r[ovFy], months));
+    agg[key] = (agg[key] || 0) + val;
+    agg['__cat1__' + key] = r.cat1;
+  });
+  const tree = Object.keys(agg).filter(k => !k.startsWith('__')).map(k => ({
+    label: k,
+    cat1: agg['__cat1__' + k],
+    value: agg[k],
+  })).filter(d => d.value > 0);
+
+  if (ovTreemapChart) ovTreemapChart.destroy();
+  const ctx = document.getElementById('ov-treemap').getContext('2d');
+  ovTreemapChart = new Chart(ctx, {
+    type: 'treemap',
+    data: {
+      datasets: [{
+        tree,
+        key: 'value',
+        groups: ['label'],
+        spacing: 1,
+        borderWidth: 1,
+        borderColor: 'rgba(6,15,30,.6)',
+        backgroundColor(ctx) {
+          if (!ctx.raw || !ctx.raw._data) return 'rgba(59,130,246,.3)';
+          return ctx.raw._data.label.indexOf('รายได้') === 0 ? 'rgba(20,184,166,.55)' : 'rgba(59,130,246,.55)';
+        },
+        labels: {
+          display: true,
+          color: '#edf2fc',
+          font: { family: 'Kanit', size: 11 },
+          formatter(ctx) {
+            if (!ctx.raw) return '';
+            const v = ctx.raw.v;
+            return [ctx.raw._data.label.split(' › ')[1] || ctx.raw._data.label, (v / 1e6).toLocaleString('en-US', { maximumFractionDigits: 1 }) + ' ลบ.'];
+          },
+        },
+      }],
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    },
+  });
+}
+
+function renderPortCompare(months) {
+  const data = PORTS.map(p => ({ name: p, net: entityNet(p, ovFy, months) }));
+  const maxAbs = Math.max(...data.map(d => Math.abs(d.net)), 1);
+  const html = data.sort((a, b) => b.net - a.net).map(d => {
+    const pct = Math.abs(d.net) / maxAbs * 100;
+    const color = d.net >= 0 ? 'var(--green2)' : 'var(--red2)';
+    return `<div class="pareto-row">
+      <div class="pr-dot" style="background:${color};"></div>
+      <div class="pr-name">${d.name}</div>
+      <div class="pr-bar-wrap"><div class="pr-bar" style="width:${pct}%;background:${color};"></div></div>
+      <div class="pr-val" style="color:${color};">${fmt(d.net / 1e6)} ลบ.</div>
+    </div>`;
+  }).join('');
+  document.getElementById('ov-ports').innerHTML = html;
+}
+
+document.querySelectorAll('#ov-year-tabs .ytab').forEach(el => {
+  el.addEventListener('click', () => {
+    document.querySelectorAll('#ov-year-tabs .ytab').forEach(n => n.classList.remove('active'));
+    el.classList.add('active');
+    ovFy = el.dataset.fy;
+    renderOverview();
+  });
+});
+
+// ════════════════════════════════════════════════════════════
+// COMPARE YoY TAB
+// ════════════════════════════════════════════════════════════
+let cmpDivChart = null;
+
+function renderCompare() {
+  const months = 8;
+  const rev69 = entityTotals('กทท.', 'fy2569', months, 'รายได้');
+  const rev68 = entityTotals('กทท.', 'fy2568', months, 'รายได้');
+  const exp69 = entityTotals('กทท.', 'fy2569', months, 'ค่าใช้จ่าย');
+  const exp68 = entityTotals('กทท.', 'fy2568', months, 'ค่าใช้จ่าย');
+  const net69 = rev69 - exp69, net68 = rev68 - exp68;
+
+  function kpiCard(label, v68, v69, colorClass, colorVar) {
+    const pct = v68 ? (v69 - v68) / Math.abs(v68) * 100 : 0;
+    const cls = pct >= 0 ? 'up' : 'dn';
+    const arrow = pct >= 0 ? '▲' : '▼';
+    return `<div class="sc ${colorClass}">
+      <div class="sc-label">${label}</div>
+      <div class="sc-val" style="color:${colorVar};">${fmt(v69 / 1e6)}</div>
+      <div class="sc-sub"><span style="color:var(--text3);">ล้านบาท · ปีก่อน ${fmt(v68 / 1e6)}</span><span class="sc-delta ${cls}">${arrow} ${fmtSigned(pct)}%</span></div>
+    </div>`;
+  }
+  document.getElementById('cmp-kpis').innerHTML =
+    kpiCard('รายได้รวม 8 เดือน', rev68, rev69, 'teal', 'var(--teal2)') +
+    kpiCard('ค่าใช้จ่ายรวม 8 เดือน', exp68, exp69, 'blue', 'var(--blue2)') +
+    kpiCard('กำไรสุทธิ 8 เดือน', net68, net69, 'amber', 'var(--amber2)');
+
+  // group by cat1>cat2
+  const rows = leafRows('กทท.');
+  const byCat = {};
+  rows.forEach(r => {
+    const key = r.cat1 + ' › ' + r.cat2;
+    if (!byCat[key]) byCat[key] = { fy2568: 0, fy2569: 0, cat1: r.cat1 };
+    byCat[key].fy2568 += sumRange(r.fy2568, months);
+    byCat[key].fy2569 += sumRange(r.fy2569, months);
+  });
+  const list = Object.keys(byCat).map(k => {
+    const d = byCat[k];
+    const deltaRaw = d.fy2569 - d.fy2568;
+    const deltaPct = d.fy2568 ? deltaRaw / Math.abs(d.fy2568) * 100 : 0;
+    return { label: k, fy2568: d.fy2568, fy2569: d.fy2569, delta: deltaRaw, deltaPct };
+  }).filter(d => d.fy2568 !== 0 || d.fy2569 !== 0)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+    .slice(0, 18);
+
+  if (cmpDivChart) cmpDivChart.destroy();
+  const ctx = document.getElementById('cmp-divbar').getContext('2d');
+  cmpDivChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: list.map(d => d.label),
+      datasets: [{
+        data: list.map(d => d.delta / 1e6),
+        backgroundColor: list.map(d => d.delta >= 0 ? 'rgba(52,211,153,.75)' : 'rgba(248,113,113,.75)'),
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      indexAxis: 'y',
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#5a7a9a', font: { family: 'Kanit' } }, grid: { color: 'rgba(59,130,246,.08)' } },
+        y: { ticks: { color: '#b4cce8', font: { family: 'Kanit', size: 10.5 } }, grid: { display: false } },
+      },
+    },
+  });
+
+  const tbody = document.querySelector('#cmp-table tbody');
+  tbody.innerHTML = list.map(d => `
+    <tr>
+      <td>${d.label}</td>
+      <td class="xp-num">${fmt(d.fy2568 / 1e6)}</td>
+      <td class="xp-num">${fmt(d.fy2569 / 1e6)}</td>
+      <td class="xp-num" style="color:${d.delta >= 0 ? 'var(--green2)' : 'var(--red2)'};">${fmtSigned(d.delta / 1e6)}</td>
+      <td class="xp-num" style="color:${d.delta >= 0 ? 'var(--green2)' : 'var(--red2)'};">${fmtSigned(d.deltaPct)}%</td>
+    </tr>`).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+// TABLE TAB
+// ════════════════════════════════════════════════════════════
+let tableSort = { key: 'amount', dir: -1 };
+
+function buildLineItems() {
+  const out = [];
+  PAT_DATA.entities.forEach(entity => {
+    leafRows(entity).forEach(r => {
+      out.push({ entity, cat1: r.cat1, cat2: r.cat2, cat3: r.cat3, item: r.item, fy2568: sumRange(r.fy2568, 8), fy2569: sumRange(r.fy2569, 8) });
+    });
+  });
+  return out;
+}
+const ALL_LINES = buildLineItems();
+
+function populateTableFilters() {
+  const entitySel = document.getElementById('tbl-entity');
+  PAT_DATA.entities.forEach(e => entitySel.insertAdjacentHTML('beforeend', `<option value="${e}">${e}</option>`));
+  const cat1Sel = document.getElementById('tbl-cat1');
+  ['รายได้', 'ค่าใช้จ่าย'].forEach(c => cat1Sel.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`));
+}
+
+function renderTable() {
+  const entity = document.getElementById('tbl-entity').value;
+  const cat1 = document.getElementById('tbl-cat1').value;
+  const fy = document.getElementById('tbl-fy').value;
+  const search = document.getElementById('tbl-search').value.trim().toLowerCase();
+
+  let rows = ALL_LINES.filter(r => {
+    if (entity && r.entity !== entity) return false;
+    if (cat1 && r.cat1 !== cat1) return false;
+    if (search && !(r.item + r.cat2 + r.cat3).toLowerCase().includes(search)) return false;
+    return true;
+  }).map(r => ({ ...r, amount: r[fy] }));
+
+  rows.sort((a, b) => {
+    const va = a[tableSort.key], vb = b[tableSort.key];
+    if (typeof va === 'number') return (va - vb) * tableSort.dir;
+    return String(va).localeCompare(String(vb)) * tableSort.dir;
+  });
+
+  const maxAbs = Math.max(...rows.map(r => Math.abs(r.amount)), 1);
+  const tbody = document.querySelector('#line-table tbody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="xp-empty">ไม่พบรายการที่ตรงกับเงื่อนไข</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.slice(0, 500).map(r => {
+    const barColor = r.cat1 === 'รายได้' ? 'rgba(20,184,166,1)' : 'rgba(59,130,246,1)';
+    const barW = Math.abs(r.amount) / maxAbs * 100;
+    return `<tr>
+      <td>${r.entity}</td>
+      <td>${r.cat1}</td>
+      <td>${r.cat2}</td>
+      <td>${r.cat3}</td>
+      <td>${r.item}</td>
+      <td class="xp-num">
+        <div class="xp-bar-fill" style="width:${barW}%;background:${barColor};"></div>
+        <span class="xp-cell-text">${fmt(r.amount)}</span>
+      </td>
+    </tr>`;
+  }).join('') + (rows.length > 500 ? `<tr><td colspan="6"><div class="xp-empty">แสดง 500 จาก ${rows.length} รายการ — ใช้ตัวกรอง/ค้นหาเพื่อดูที่เหลือ</div></td></tr>` : '');
+}
+
+document.querySelectorAll('#line-table thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    tableSort.dir = (tableSort.key === key) ? -tableSort.dir : -1;
+    tableSort.key = key;
+    renderTable();
+  });
+});
+['tbl-entity', 'tbl-cat1', 'tbl-fy', 'tbl-search'].forEach(id => {
+  document.getElementById(id).addEventListener('input', renderTable);
+});
+
+// ════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════
+populateTableFilters();
+renderOverview();
+renderCompare();
+renderTable();
+
+// ════════════════════════════════════════════════════════════
+// PIN GATE (identical mechanism to Fintrix)
+// ════════════════════════════════════════════════════════════
+(function () {
+  const PAT_ALLOWED_DOMAIN = 'port.co.th';
+  const PAT_CODE_HASH = '0adfc5dfa66ddf90e5e3b6b5fd730aeb5b67d7968a9bd38533db37b584c930e0';
+  const PAT_SESSION_KEY = 'pat_gate_auth_v1';
+
+  async function sha256Hex(text) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  function parseJwt(token) {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')));
+  }
+  function showMain() {
+    document.getElementById('pat-gate-overlay').style.display = 'none';
+    document.getElementById('pat-main-content').style.display = 'block';
+  }
+  window.patHandleCredential = function (response) {
+    const payload = parseJwt(response.credential);
+    const email = (payload.email || '').trim().toLowerCase();
+    if (email.endsWith('@' + PAT_ALLOWED_DOMAIN.toLowerCase())) {
+      document.getElementById('pat-gate-step-email').classList.remove('active');
+      document.getElementById('pat-gate-step-code').classList.add('active');
+      document.getElementById('pat-gate-email-display').textContent = email;
+      window._patPendingEmail = email;
+    } else {
+      document.getElementById('pat-gate-email-error').classList.add('show');
+    }
+  };
+  window.patCheckCode = async function () {
+    const val = document.getElementById('pat-gate-code').value.trim();
+    const hash = await sha256Hex(val);
+    if (hash === PAT_CODE_HASH) {
+      localStorage.setItem(PAT_SESSION_KEY, window._patPendingEmail || 'verified');
+      showMain();
+    } else {
+      document.getElementById('pat-gate-code-error').classList.add('show');
+    }
+  };
+  window.addEventListener('load', function () {
+    if (localStorage.getItem(PAT_SESSION_KEY)) {
+      showMain();
+    }
+  });
+})();
+</script>
+</body>
+</html>
